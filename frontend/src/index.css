@@ -1,0 +1,37 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-wos-bg text-neutral-800 antialiased font-sans;
+}
+
+.panel {
+  @apply bg-wos-panel border border-wos-border rounded-xl p-5;
+}
+
+.btn {
+  @apply px-4 py-2 rounded-lg bg-wos-accent hover:bg-wos-accent2 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-ghost {
+  @apply px-4 py-2 rounded-lg border border-wos-border hover:border-wos-accent text-sm transition-colors disabled:opacity-50;
+}
+
+.input {
+  @apply w-full bg-white border border-wos-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-wos-accent;
+}
+
+.label {
+  @apply block text-xs uppercase tracking-wide text-neutral-600 mb-1;
+}
+
+.tag {
+  @apply inline-block text-xs px-2 py-0.5 rounded-full border border-wos-border bg-white;
+}
