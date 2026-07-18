@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
@@ -11,6 +12,11 @@ export default {
           accent: "#161616",
           accent2: "#000000",
           ok: "#166534",
+          // dark theme counterparts (warm near-blacks to match the milk panels)
+          dbg: "#0e0d0b",
+          dpanel: "#171511",
+          dcard: "#1d1b16",
+          dborder: "#2b2820",
         },
       },
       fontFamily: {

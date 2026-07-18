@@ -39,12 +39,12 @@ export default function Login({ mode }) {
           <input className="input" type="password" value={password} required minLength={8}
                  onChange={(e) => setPassword(e.target.value)} />
         </div>
-        {err && <p className="text-sm text-red-700">{err}</p>}
+        {err && <p className="text-sm text-red-700 dark:text-red-400">{err}</p>}
         <button className="btn w-full" disabled={busy}>
           {busy ? "…" : signup ? "Sign up" : "Log in"}
         </button>
       </form>
-      <p className="text-sm text-neutral-600 mt-4">
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-4">
         {signup ? "Already have an account? " : "New here? "}
         <Link to={signup ? "/login" : "/signup"} className="underline">
           {signup ? "Log in" : "Create one"}

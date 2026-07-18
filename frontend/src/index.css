@@ -9,29 +9,33 @@
 @tailwind utilities;
 
 body {
-  @apply bg-wos-bg text-neutral-800 antialiased font-sans;
+  @apply bg-wos-bg text-neutral-800 antialiased font-sans dark:bg-wos-dbg dark:text-neutral-200;
 }
 
 .panel {
-  @apply bg-wos-panel border border-wos-border rounded-xl p-5;
+  @apply bg-wos-panel border border-wos-border rounded-xl p-5 dark:bg-wos-dpanel dark:border-wos-dborder;
 }
 
 .btn {
-  @apply px-4 py-2 rounded-lg bg-wos-accent hover:bg-wos-accent2 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply px-4 py-2 rounded-lg bg-wos-accent hover:bg-wos-accent2 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-neutral-300;
 }
 
 .btn-ghost {
-  @apply px-4 py-2 rounded-lg border border-wos-border hover:border-wos-accent text-sm transition-colors disabled:opacity-50;
+  @apply px-4 py-2 rounded-lg border border-wos-border hover:border-wos-accent text-sm transition-colors disabled:opacity-50 dark:border-wos-dborder dark:hover:border-white;
 }
 
 .input {
-  @apply w-full bg-white border border-wos-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-wos-accent;
+  @apply w-full bg-white border border-wos-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-wos-accent dark:bg-wos-dcard dark:border-wos-dborder dark:text-neutral-100 dark:focus:border-white;
 }
 
 .label {
-  @apply block text-xs uppercase tracking-wide text-neutral-600 mb-1;
+  @apply block text-xs uppercase tracking-wide text-neutral-600 mb-1 dark:text-neutral-400;
 }
 
 .tag {
-  @apply inline-block text-xs px-2 py-0.5 rounded-full border border-wos-border bg-white;
+  @apply inline-block text-xs px-2 py-0.5 rounded-full border border-wos-border bg-white dark:bg-wos-dcard dark:border-wos-dborder;
+}
+
+.card-inner {
+  @apply border border-wos-border rounded-lg p-3 bg-white dark:bg-wos-dcard dark:border-wos-dborder;
 }

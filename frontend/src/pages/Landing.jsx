@@ -55,7 +55,7 @@ export default function Landing() {
           <br />
           handled end to end.
         </h1>
-        <p className="text-lg text-neutral-600 mt-6 max-w-2xl">
+        <p className="text-lg text-neutral-600 dark:text-neutral-400 mt-6 max-w-2xl">
           ManagerX scans the Web3 job market, writes a CV tuned to each posting from
           your one profile, and — when the offer lands — turns it into a work
           agreement signed onchain. Finished work becomes verifiable track record.
@@ -70,16 +70,16 @@ export default function Landing() {
           </Link>
         </div>
         {stats && (
-          <div className="flex flex-wrap gap-x-8 gap-y-2 mt-10 font-mono text-sm text-neutral-600">
-            <span><b className="text-black">{stats.total}</b> open roles indexed</span>
-            <span><b className="text-black">{stats.categories}</b> categories</span>
-            <span>registry live on <b className="text-black">X Layer</b></span>
+          <div className="flex flex-wrap gap-x-8 gap-y-2 mt-10 font-mono text-sm text-neutral-600 dark:text-neutral-400">
+            <span><b className="text-black dark:text-white">{stats.total}</b> open roles indexed</span>
+            <span><b className="text-black dark:text-white">{stats.categories}</b> categories</span>
+            <span>registry live on <b className="text-black dark:text-white">X Layer</b></span>
           </div>
         )}
       </section>
 
       {/* ── Features ────────────────────────────────────────────────── */}
-      <section id="features" className="border-t border-wos-border scroll-mt-16">
+      <section id="features" className="border-t border-wos-border dark:border-wos-dborder scroll-mt-16">
         <div className="max-w-5xl mx-auto px-4 py-16">
           <h2 className="text-2xl font-semibold tracking-tight mb-8">
             One profile in. Everything else is generated.
@@ -91,7 +91,7 @@ export default function Landing() {
                   {f.tag}
                 </p>
                 <h3 className="font-medium text-lg mb-2">{f.title}</h3>
-                <p className="text-sm text-neutral-600 leading-relaxed">{f.body}</p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{f.body}</p>
               </div>
             ))}
           </div>
@@ -99,17 +99,17 @@ export default function Landing() {
       </section>
 
       {/* ── How it works ────────────────────────────────────────────── */}
-      <section id="how" className="border-t border-wos-border scroll-mt-16">
+      <section id="how" className="border-t border-wos-border dark:border-wos-dborder scroll-mt-16">
         <div className="max-w-5xl mx-auto px-4 py-16">
           <h2 className="text-2xl font-semibold tracking-tight mb-8">How it works</h2>
           <ol className="grid sm:grid-cols-5 gap-4">
             {STEPS.map(([title, body], i) => (
               <li key={title} className="relative">
-                <div className="font-mono text-3xl text-neutral-300 mb-2">
+                <div className="font-mono text-3xl text-neutral-300 dark:text-neutral-600 mb-2">
                   {String(i + 1).padStart(2, "0")}
                 </div>
                 <div className="font-medium text-sm mb-1">{title}</div>
-                <p className="text-xs text-neutral-600 leading-relaxed">{body}</p>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">{body}</p>
               </li>
             ))}
           </ol>
@@ -117,12 +117,12 @@ export default function Landing() {
       </section>
 
       {/* ── Onchain strip ───────────────────────────────────────────── */}
-      <section className="border-t border-wos-border bg-wos-panel">
+      <section className="border-t border-wos-border dark:border-wos-dborder bg-wos-panel dark:bg-wos-dpanel">
         <div className="max-w-5xl mx-auto px-4 py-10">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[260px]">
               <h3 className="font-medium">Signatures are real transactions.</h3>
-              <p className="text-sm text-neutral-600 mt-1">
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
                 Agreements live in the SignatureRegistry contract on X Layer (chain 196).
                 Every signature is a wallet transaction; every executed agreement is
                 independently verifiable against the document hash.
@@ -138,12 +138,12 @@ export default function Landing() {
       </section>
 
       {/* ── Final CTA ───────────────────────────────────────────────── */}
-      <section className="border-t border-wos-border">
+      <section className="border-t border-wos-border dark:border-wos-dborder">
         <div className="max-w-5xl mx-auto px-4 py-16 text-center">
           <h2 className="text-3xl font-semibold tracking-tight">
             Start with your profile.
           </h2>
-          <p className="text-neutral-600 mt-3 max-w-xl mx-auto">
+          <p className="text-neutral-600 dark:text-neutral-400 mt-3 max-w-xl mx-auto">
             Ten minutes of setup, then every application and every contract is a
             projection of the same data — and every finished job strengthens it.
           </p>

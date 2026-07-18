@@ -63,7 +63,7 @@ export default function JobDetail({ jobId }) {
         <div className="flex items-start gap-3">
           <div>
             <h1 className="text-xl font-semibold">{parsed.role || "Role"}</h1>
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
               {parsed.firm || "Unknown firm"}
               {parsed.ecosystem && ` · ${parsed.ecosystem}`}
               {parsed.comp_range && ` · ${parsed.comp_range}`}
@@ -82,7 +82,7 @@ export default function JobDetail({ jobId }) {
         </p>
       </div>
 
-      {err && <p className="text-sm text-red-700">{err}</p>}
+      {err && <p className="text-sm text-red-700 dark:text-red-400">{err}</p>}
 
       {/* ── Tailored CV ─────────────────────────────────────────────── */}
       <div className="panel">
@@ -129,10 +129,10 @@ export default function JobDetail({ jobId }) {
                        e.target.value.split(",").map((s) => s.trim()).filter(Boolean))} />
             </div>
             {(cv.experience || []).map((exp, i) => (
-              <div key={i} className="border border-wos-border rounded-lg p-3 bg-white">
+              <div key={i} className="card-inner">
                 <div className="text-sm font-medium">
                   {exp.title} — {exp.org}
-                  {exp.verified && <span className="text-wos-ok text-xs ml-2">onchain-verified ✓</span>}
+                  {exp.verified && <span className="text-wos-ok dark:text-green-400 text-xs ml-2">onchain-verified ✓</span>}
                   <span className="text-neutral-500 font-normal ml-2">{exp.start} – {exp.end}</span>
                 </div>
                 <textarea className="input font-mono mt-2" rows={Math.max(2, (exp.bullets || []).length)}
@@ -153,7 +153,7 @@ export default function JobDetail({ jobId }) {
         <div className="panel flex items-center gap-4">
           <div className="flex-1">
             <h2 className="font-medium">Got the offer / gig?</h2>
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
               Marking it accepted unlocks the work-agreement stage — scope of work drafts
               from the same profile data the CV used.
             </p>
@@ -252,7 +252,7 @@ function AgreementPanel({ agreement, busy, run, privacyMode, setPrivacyMode, sig
       </p>
 
       {draft && (
-        <div className="border-t border-wos-border pt-3 space-y-3">
+        <div className="border-t border-wos-border dark:border-wos-dborder pt-3 space-y-3">
           <button className="btn-ghost" disabled={busy === "saveagr"}
                   onClick={() => run("saveagr", () =>
                     api("PUT", `/v1/agreements/${agreement.agreement_id}`, { content: local }))}>
@@ -289,8 +289,8 @@ function AgreementPanel({ agreement, busy, run, privacyMode, setPrivacyMode, sig
       )}
 
       {agreement.status === "executed" && (
-        <div className="border-t border-wos-border pt-3 text-sm">
-          <p className="text-wos-ok font-medium">
+        <div className="border-t border-wos-border dark:border-wos-dborder pt-3 text-sm">
+          <p className="text-wos-ok dark:text-green-400 font-medium">
             Fully executed onchain ✓ — added to your verified work history.
           </p>
           <p className="font-mono text-xs mt-1 break-all">
@@ -309,7 +309,7 @@ function AgreementPanel({ agreement, busy, run, privacyMode, setPrivacyMode, sig
 function PendingSignatures({ agreement, busy, run }) {
   const onchain = agreement.onchain;
   return (
-    <div className="border-t border-wos-border pt-3 space-y-3">
+    <div className="border-t border-wos-border dark:border-wos-dborder pt-3 space-y-3">
       <p className="text-sm">
         Doc hash locked: <span className="font-mono text-xs break-all">{agreement.doc_hash}</span>
       </p>

@@ -67,7 +67,7 @@ export default function Board() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight">Job board</h1>
-        <p className="text-neutral-600 mt-1">
+        <p className="text-neutral-600 dark:text-neutral-400 mt-1">
           Scanned continuously from Web3 career pages and aggregators. Pick a listing
           and get a CV tailored to it in one click.
         </p>
@@ -109,14 +109,14 @@ export default function Board() {
         <span className="text-sm text-neutral-500 self-center">{data.total} listings</span>
       </div>
 
-      {err && <p className="text-sm text-red-700 mb-4">{err}</p>}
+      {err && <p className="text-sm text-red-700 dark:text-red-400 mb-4">{err}</p>}
 
       <div className="space-y-3">
         {data.listings.map((listing) => (
           <div key={listing.listing_id} className="panel flex items-start gap-4">
             <div className="flex-1 min-w-0">
               <div className="font-medium">{listing.role}</div>
-              <div className="text-sm text-neutral-600">
+              <div className="text-sm text-neutral-600 dark:text-neutral-400">
                 {listing.firm}
                 {listing.location && ` · ${listing.location}`}
                 {listing.remote === "yes" && " · Remote"}
@@ -146,7 +146,7 @@ export default function Board() {
 
       <div className="panel mt-10 max-w-xl">
         <h2 className="font-medium mb-1">Email digests</h2>
-        <p className="text-sm text-neutral-600 mb-3">
+        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
           Get new listings matching your filters — uses the category and ecosystem
           selected above, plus any keywords.
         </p>

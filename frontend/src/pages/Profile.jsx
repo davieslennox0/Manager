@@ -39,7 +39,7 @@ export default function Profile() {
         <h1 className="text-2xl font-semibold">Profile — your data spine</h1>
         <button className="btn ml-auto" onClick={save}>Save</button>
       </div>
-      <p className="text-sm text-neutral-600 -mt-3 max-w-2xl">
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 -mt-3 max-w-2xl">
         Every tailored CV and every work agreement is generated from this one object.
         Executed onchain agreements append verified entries below automatically.
       </p>
@@ -83,7 +83,7 @@ export default function Profile() {
         </div>
         <div className="space-y-4">
           {(p.experience || []).map((exp, i) => (
-            <div key={i} className="border border-wos-border rounded-lg p-3 bg-white space-y-2">
+            <div key={i} className="card-inner space-y-2">
               <div className="grid sm:grid-cols-4 gap-2">
                 {[["title", "Title"], ["org", "Organisation"], ["start", "Start"], ["end", "End"]].map(([f, ph]) => (
                   <input key={f} className="input" placeholder={ph} value={exp[f] || ""}
@@ -102,7 +102,7 @@ export default function Profile() {
                           next[i] = { ...exp, bullets: e.target.value.split("\n").filter(Boolean) };
                           set("experience", next);
                         }} />
-              <button className="text-xs text-red-700 underline"
+              <button className="text-xs text-red-700 dark:text-red-400 underline"
                       onClick={() => set("experience", p.experience.filter((_, k) => k !== i))}>
                 Remove
               </button>
@@ -131,16 +131,16 @@ export default function Profile() {
         )}
         <div className="space-y-3">
           {(p.verified_work_history || []).map((h, i) => (
-            <div key={i} className="border border-wos-border rounded-lg p-3 bg-white">
+            <div key={i} className="card-inner">
               <div className="font-medium text-sm">{h.title}</div>
-              <div className="text-xs text-neutral-600">
+              <div className="text-xs text-neutral-600 dark:text-neutral-400">
                 {h.counterparty && `${h.counterparty} · `}{h.start} – {h.end}
               </div>
               <div className="text-xs font-mono mt-1 break-all">
                 <a className="underline" href={explorerTx(h.onchain_tx)} target="_blank" rel="noreferrer">
                   {h.onchain_tx.slice(0, 18)}… ↗
                 </a>
-                <span className="text-wos-ok ml-2">verified ✓</span>
+                <span className="text-wos-ok dark:text-green-400 ml-2">verified ✓</span>
               </div>
             </div>
           ))}

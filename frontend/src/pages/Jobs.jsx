@@ -49,7 +49,7 @@ export default function Jobs() {
           <textarea className="input font-mono min-h-[120px]"
                     placeholder="…or paste the raw job posting text here"
                     value={rawText} onChange={(e) => setRawText(e.target.value)} />
-          {err && <p className="text-sm text-red-700">{err}</p>}
+          {err && <p className="text-sm text-red-700 dark:text-red-400">{err}</p>}
           <button className="btn" disabled={busy || (!url && !rawText)}>
             {busy ? "Parsing posting…" : "Parse posting"}
           </button>
@@ -59,10 +59,10 @@ export default function Jobs() {
       <div className="space-y-3">
         {jobs.map((job) => (
           <Link key={job.job_id} to={`/job/${job.job_id}`}
-                className="panel flex items-center gap-4 hover:border-wos-accent block">
+                className="panel flex items-center gap-4 hover:border-wos-accent dark:hover:border-white block">
             <div className="flex-1 min-w-0">
               <div className="font-medium">{job.parsed.role || "Untitled role"}</div>
-              <div className="text-sm text-neutral-600">
+              <div className="text-sm text-neutral-600 dark:text-neutral-400">
                 {job.parsed.firm || "—"} · {new Date(job.created_at + "Z").toLocaleDateString()}
               </div>
             </div>
