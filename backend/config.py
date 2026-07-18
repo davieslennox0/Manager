@@ -38,7 +38,7 @@ SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "WorkOS <no-reply@localhost>")
+SMTP_FROM = os.getenv("SMTP_FROM", "ManagerX <no-reply@localhost>")
 SMTP_ENABLED = bool(SMTP_HOST and SMTP_USER and SMTP_PASSWORD)
 
 SCANNER_ENABLED = os.getenv("SCANNER_ENABLED", "1") == "1"

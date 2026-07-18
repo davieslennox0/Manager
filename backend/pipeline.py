@@ -79,7 +79,7 @@ Candidate profile + verified history:
 
 async def fetch_posting_text(url: str) -> str:
     async with httpx.AsyncClient(timeout=30, follow_redirects=True,
-                                 headers={"User-Agent": "WorkOS/1.0 job-application agent"}) as client:
+                                 headers={"User-Agent": "ManagerX/1.0 job-application agent"}) as client:
         resp = await client.get(url)
     resp.raise_for_status()
     text = resp.text

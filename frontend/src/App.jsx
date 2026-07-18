@@ -13,7 +13,7 @@ function Nav() {
     <nav className="border-b border-wos-border">
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-5">
         <Link to="/" className="font-semibold tracking-tight text-lg">
-          Work<span className="text-neutral-500">OS</span>
+          Manager<span className="text-neutral-500">X</span>
         </Link>
         <Link to="/" className="text-sm text-neutral-600 hover:text-black">Job board</Link>
         {authed && (

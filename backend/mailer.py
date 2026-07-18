@@ -59,12 +59,12 @@ def send_digests(new_listing_ids: list[str]):
                  + (f" [{l['ecosystem']}]" if l["ecosystem"] else "")
                  + (f" ({l['location']})" if l["location"] else "")
                  + f"\n  {l['url']}" for l in hits[:25]]
-        body = ("New listings matching your WorkOS filters:\n\n" + "\n".join(lines)
+        body = ("New listings matching your ManagerX filters:\n\n" + "\n".join(lines)
                 + f"\n\nBrowse + one-click tailored CV: {config.PUBLIC_BASE_URL}/jobs"
                 + f"\nUnsubscribe: {config.PUBLIC_BASE_URL}/api/unsubscribe/{sub['sub_id']}")
         if config.SMTP_ENABLED:
             try:
-                _send(sub["email"], f"WorkOS: {len(hits)} new matching listing(s)", body)
+                _send(sub["email"], f"ManagerX: {len(hits)} new matching listing(s)", body)
                 sent.append(sub["sub_id"])
             except Exception:
                 continue  # transient SMTP failure — next tick's digest catches up

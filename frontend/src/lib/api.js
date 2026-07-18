@@ -21,7 +21,7 @@ export async function api(method, path, body) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error("Could not reach the WorkOS API — check your connection and try again.");
+    throw new Error("Could not reach the ManagerX API — check your connection and try again.");
   }
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) {

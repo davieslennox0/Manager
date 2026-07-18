@@ -1,4 +1,4 @@
-"""WorkOS API — job-first application pipeline: posting -> tailored CV -> accepted
+"""ManagerX API — job-first application pipeline: posting -> tailored CV -> accepted
 offer -> onchain-signed work agreement -> verified work history. Plus the
 discovery layer: scanner-fed public job board + email digests."""
 import asyncio
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
         task.cancel()
 
 
-app = FastAPI(title="WorkOS", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="ManagerX", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 
@@ -46,7 +46,7 @@ for r in (auth_router, profile_router, job_router, agreement_router, listing_rou
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "service": "workos",
+    return {"ok": True, "service": "managerx",
             "chain_id": config.CHAIN_ID,
             "registry": config.REGISTRY_ADDRESS or None,
             "scanner": config.SCANNER_ENABLED,

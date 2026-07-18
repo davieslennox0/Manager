@@ -69,7 +69,7 @@ def _strip_html(markup: str) -> str:
 
 async def _fetch_json(url: str):
     async with httpx.AsyncClient(timeout=30, follow_redirects=True,
-                                 headers={"User-Agent": "WorkOS/1.0 job scanner"}) as c:
+                                 headers={"User-Agent": "ManagerX/1.0 job scanner"}) as c:
         resp = await c.get(url)
     resp.raise_for_status()
     return resp.json()
@@ -114,7 +114,7 @@ async def _poll_lever(source) -> list[dict]:
 
 async def _poll_rss(source) -> list[dict]:
     async with httpx.AsyncClient(timeout=30, follow_redirects=True,
-                                 headers={"User-Agent": "WorkOS/1.0 job scanner"}) as c:
+                                 headers={"User-Agent": "ManagerX/1.0 job scanner"}) as c:
         resp = await c.get(source["target"])
     resp.raise_for_status()
     feed = feedparser.parse(resp.text)
@@ -139,7 +139,7 @@ async def _poll_rss(source) -> list[dict]:
 async def _poll_scrape(source) -> list[dict]:
     """Fallback for career pages with no API/feed: fetch, strip, LLM-extract."""
     async with httpx.AsyncClient(timeout=30, follow_redirects=True,
-                                 headers={"User-Agent": "WorkOS/1.0 job scanner"}) as c:
+                                 headers={"User-Agent": "ManagerX/1.0 job scanner"}) as c:
         resp = await c.get(source["target"])
     resp.raise_for_status()
     text = _strip_html(resp.text)[:25000]

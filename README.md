@@ -1,4 +1,4 @@
-# WorkOS
+# ManagerX
 
 Job-first pipeline: take a job posting → generate a CV tailored to exactly that
 posting → when the offer/gig lands, draft the work agreement from the same data →

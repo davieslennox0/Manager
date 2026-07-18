@@ -1,6 +1,6 @@
 """LLM access: Gemini first, automatic fallback to Groq on error/timeout/429 —
 the same chain the sibling services run. One entry point returns parsed JSON
-(every WorkOS generation step is a structured-output task)."""
+(every ManagerX generation step is a structured-output task)."""
 import json
 
 import httpx

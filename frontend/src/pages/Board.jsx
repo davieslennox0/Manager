@@ -64,7 +64,7 @@ export default function Board() {
           Web3 jobs, scanned continuously.
         </h1>
         <p className="text-neutral-600 mt-2 max-w-2xl">
-          Pick a listing (or paste your own) and WorkOS generates a CV tailored to that
+          Pick a listing (or paste your own) and ManagerX generates a CV tailored to that
           posting from your profile. When the offer lands, the work agreement drafts
           itself from the same data and signs onchain.
         </p>
