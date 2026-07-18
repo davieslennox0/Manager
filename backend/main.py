@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     init_db()
     auth.seed_admin()
     scanner.seed_sources()
+    scanner.backfill_categories()
     task = None
     if config.SCANNER_ENABLED:
         task = asyncio.create_task(scanner.scanner_loop())

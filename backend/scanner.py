@@ -26,6 +26,35 @@ _ECO_SAFE = ["ethereum", "solana", "bitcoin", "polygon", "arbitrum", "optimism",
              "x layer", "cardano"]
 _ECO_BRANDED = ["Base", "NEAR", "Near Protocol", "Sui", "TON", "TRON", "BNB"]
 
+# Ordered: first bucket whose keyword hits the ROLE TITLE wins, so specific
+# buckets (Security, Design) sit above the broad ones they'd otherwise lose to
+# ("Security Engineer" -> Security, "Product Designer" -> Design).
+_CATEGORIES = [
+    ("Security", ["security", "auditor", "audit", "pentest", "cryptograph", "incident"]),
+    ("Design", ["design", "ux", "ui ", "brand", "creative", "motion", "graphic", "art director"]),
+    ("Data & Research", ["data", "analytics", "analyst", "machine learning", "ml engineer",
+                         "scientist", "research", "quant", "economist", "ai "]),
+    ("Product", ["product manager", "product owner", "product lead", "program manager",
+                 "project manager", "technical writer", "documentation"]),
+    ("Engineering", ["engineer", "developer", "solidity", "rust", "backend", "frontend",
+                     "full-stack", "fullstack", "full stack", "devops", "sre", "software",
+                     "protocol", "smart contract", "infrastructure", "architect", "qa",
+                     "mobile", "android", "ios", "sdet", "tech lead", "cto"]),
+    ("Marketing & Growth", ["marketing", "growth", "content", "seo", "social media",
+                            "communication", "comms", "public relations", "pr manager",
+                            "copywriter", "brand", "events", "ecosystem"]),
+    ("Sales & BD", ["sales", "business development", "bd manager", "partnership",
+                    "account manager", "account executive", "listings manager",
+                    "institutional", "otc"]),
+    ("Community & Support", ["community", "ambassador", "moderator", "support",
+                             "customer", "success"]),
+    ("Legal & Compliance", ["legal", "counsel", "compliance", "regulatory", "policy",
+                            "aml", "kyc", "risk"]),
+    ("Operations & People", ["operations", "office", "people", "hr ", "human resources",
+                             "recruit", "talent", "finance", "accounting", "accountant",
+                             "treasury", "payroll", "executive assistant", "chief of staff"]),
+]
+
 _SKILL_HINTS = ["solidity", "rust", "go", "typescript", "python", "react", "node",
                 "evm", "defi", "zk", "cryptography", "smart contract", "protocol",
                 "security", "audit", "devops", "kubernetes", "data", "ml",
@@ -49,6 +78,17 @@ def _tag_ecosystem(text: str) -> str:
             return {"NEAR": "Near", "Near Protocol": "Near", "TON": "Ton",
                     "TRON": "Tron"}.get(e, e)
     return ""
+
+
+def _tag_category(role: str, blob: str = "") -> str:
+    """Bucket a listing by role title first, full text as tiebreaker."""
+    for text in (role.lower(), blob.lower()):
+        if not text:
+            continue
+        for name, keywords in _CATEGORIES:
+            if any(k in text for k in keywords):
+                return name
+    return "Other"
 
 
 def _tag_skills(text: str) -> list[str]:
@@ -180,11 +220,13 @@ def _upsert_listings(source_id: str, rows: list[dict]) -> list[str]:
         lid = "lst_" + uuid.uuid4().hex[:12]
         conn.execute(
             """INSERT INTO listings (listing_id, source_id, external_id, role, firm,
-               ecosystem, comp_range, skills, remote, location, url, posted_at, content_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               ecosystem, comp_range, skills, remote, location, url, posted_at,
+               category, content_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (lid, source_id, r["external_id"], r["role"], r["firm"], r["ecosystem"],
              r["comp_range"], json.dumps(r["skills"]), r["remote"], r["location"],
-             r["url"], r["posted_at"], ch))
+             r["url"], r["posted_at"],
+             _tag_category(r["role"], " ".join(r["skills"])), ch))
         new_ids.append(lid)
     conn.commit()
     conn.close()
@@ -236,6 +278,18 @@ SEED_SOURCES = [
     ("lever", "Immutable", "immutable", 21600),
     ("rss", "CryptocurrencyJobs", "https://cryptocurrencyjobs.co/index.xml", 3600),
 ]
+
+
+def backfill_categories():
+    """One-time pass for rows inserted before the category column existed."""
+    conn = get_conn()
+    rows = conn.execute("SELECT listing_id, role, skills FROM listings "
+                        "WHERE category = ''").fetchall()
+    for r in rows:
+        conn.execute("UPDATE listings SET category = ? WHERE listing_id = ?",
+                     (_tag_category(r["role"], r["skills"] or ""), r["listing_id"]))
+    conn.commit()
+    conn.close()
 
 
 def seed_sources():

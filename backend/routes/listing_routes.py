@@ -22,6 +22,7 @@ class SubscribeBody(BaseModel):
 
 @router.get("/listings")
 async def listings(q: str = "", ecosystem: str = "", firm: str = "", remote: str = "",
+                   category: str = "",
                    limit: int = Query(100, le=500), offset: int = 0):
     where, args = ["active = 1"], []
     if q:
@@ -36,18 +37,27 @@ async def listings(q: str = "", ecosystem: str = "", firm: str = "", remote: str
     if remote:
         where.append("remote = ?")
         args.append(remote)
+    if category:
+        where.append("category = ?")
+        args.append(category)
     conn = get_conn()
     rows = conn.execute(
         f"SELECT * FROM listings WHERE {' AND '.join(where)} "
         f"ORDER BY first_seen DESC LIMIT ? OFFSET ?", args + [limit, offset]).fetchall()
     total = conn.execute(f"SELECT COUNT(*) c FROM listings WHERE {' AND '.join(where)}",
                          args).fetchone()["c"]
-    facets = conn.execute(
+    eco_facets = conn.execute(
         "SELECT ecosystem, COUNT(*) c FROM listings WHERE active=1 AND ecosystem != '' "
         "GROUP BY ecosystem ORDER BY c DESC LIMIT 20").fetchall()
+    cat_facets = conn.execute(
+        "SELECT category, COUNT(*) c FROM listings WHERE active=1 AND category != '' "
+        "GROUP BY category ORDER BY c DESC").fetchall()
     conn.close()
     return {"total": total,
-            "facets": {"ecosystems": [{"name": f["ecosystem"], "count": f["c"]} for f in facets]},
+            "facets": {
+                "ecosystems": [{"name": f["ecosystem"], "count": f["c"]} for f in eco_facets],
+                "categories": [{"name": f["category"], "count": f["c"]} for f in cat_facets],
+            },
             "listings": [{**dict(r), "skills": j(r["skills"], [])} for r in rows]}
 
 

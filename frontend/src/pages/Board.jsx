@@ -3,10 +3,12 @@ import { api, getToken } from "../lib/api";
 import { navigate } from "../lib/router";
 
 export default function Board() {
-  const [data, setData] = useState({ total: 0, listings: [], facets: { ecosystems: [] } });
+  const [data, setData] = useState({ total: 0, listings: [],
+                                     facets: { ecosystems: [], categories: [] } });
   const [q, setQ] = useState("");
   const [eco, setEco] = useState("");
   const [remote, setRemote] = useState("");
+  const [category, setCategory] = useState("");
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState("");
   const [subEmail, setSubEmail] = useState("");
@@ -18,17 +20,18 @@ export default function Board() {
     if (q) params.set("q", q);
     if (eco) params.set("ecosystem", eco);
     if (remote) params.set("remote", remote);
+    if (category) params.set("category", category);
     try {
       setData(await api("GET", `/v1/listings?${params}`));
     } catch (error) {
       setErr(error.message);
     }
   }
-  useEffect(() => { load(); }, [eco, remote]);
+  useEffect(() => { load(); }, [eco, remote, category]);
 
   async function tailor(listing) {
     if (!getToken()) {
-      navigate("/login?next=/");
+      navigate("/login?next=/board");
       return;
     }
     setBusyId(listing.listing_id);
@@ -49,6 +52,7 @@ export default function Board() {
       await api("POST", "/v1/subscriptions", {
         email: subEmail,
         ecosystem: eco,
+        role_keywords: category ? [category.split(" ")[0]] : [],
         keywords: subKeywords.split(",").map((s) => s.trim()).filter(Boolean),
       });
       setSubMsg("Subscribed — digests send as matching listings appear.");
@@ -57,17 +61,34 @@ export default function Board() {
     }
   }
 
+  const allCount = data.facets.categories.reduce((n, f) => n + f.count, 0);
+
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Web3 jobs, scanned continuously.
-        </h1>
-        <p className="text-neutral-600 mt-2 max-w-2xl">
-          Pick a listing (or paste your own) and ManagerX generates a CV tailored to that
-          posting from your profile. When the offer lands, the work agreement drafts
-          itself from the same data and signs onchain.
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold tracking-tight">Job board</h1>
+        <p className="text-neutral-600 mt-1">
+          Scanned continuously from Web3 career pages and aggregators. Pick a listing
+          and get a CV tailored to it in one click.
         </p>
+      </div>
+
+      {/* Category pills */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button onClick={() => setCategory("")}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  category === "" ? "bg-wos-accent text-white border-wos-accent"
+                                  : "border-wos-border hover:border-wos-accent"}`}>
+          All {allCount > 0 && <span className="opacity-60">({allCount})</span>}
+        </button>
+        {data.facets.categories.map((f) => (
+          <button key={f.name} onClick={() => setCategory(f.name === category ? "" : f.name)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    category === f.name ? "bg-wos-accent text-white border-wos-accent"
+                                        : "border-wos-border hover:border-wos-accent"}`}>
+            {f.name} <span className="opacity-60">({f.count})</span>
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-3 mb-5">
@@ -85,7 +106,7 @@ export default function Board() {
           <option value="yes">Remote</option>
         </select>
         <button className="btn-ghost" onClick={load}>Search</button>
-        <span className="text-sm text-neutral-500 self-center">{data.total} open listings</span>
+        <span className="text-sm text-neutral-500 self-center">{data.total} listings</span>
       </div>
 
       {err && <p className="text-sm text-red-700 mb-4">{err}</p>}
@@ -102,8 +123,9 @@ export default function Board() {
                 {listing.comp_range && ` · ${listing.comp_range}`}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
+                {listing.category && <span className="tag font-medium">{listing.category}</span>}
                 {listing.ecosystem && <span className="tag">{listing.ecosystem}</span>}
-                {listing.skills.slice(0, 6).map((s) => <span key={s} className="tag">{s}</span>)}
+                {listing.skills.slice(0, 5).map((s) => <span key={s} className="tag">{s}</span>)}
               </div>
             </div>
             <div className="flex flex-col gap-2 shrink-0">
@@ -117,13 +139,16 @@ export default function Board() {
             </div>
           </div>
         ))}
+        {data.listings.length === 0 && !err && (
+          <p className="text-sm text-neutral-500">No listings match these filters.</p>
+        )}
       </div>
 
       <div className="panel mt-10 max-w-xl">
         <h2 className="font-medium mb-1">Email digests</h2>
         <p className="text-sm text-neutral-600 mb-3">
-          Get new listings matching your filters. Uses the ecosystem selected above
-          plus any keywords.
+          Get new listings matching your filters — uses the category and ecosystem
+          selected above, plus any keywords.
         </p>
         <form onSubmit={subscribe} className="flex flex-wrap gap-2">
           <input className="input max-w-[220px]" type="email" required placeholder="you@example.com"

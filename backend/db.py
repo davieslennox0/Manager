@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS listings (
     location    TEXT NOT NULL DEFAULT '',
     url         TEXT NOT NULL,
     posted_at   TEXT NOT NULL DEFAULT '',
+    category    TEXT NOT NULL DEFAULT '',            -- Engineering / Design / … (scanner classifier)
     content_hash TEXT NOT NULL,                      -- dedup key across sources
     first_seen  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -115,6 +116,7 @@ CREATE TABLE IF NOT EXISTS listings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_listings_hash ON listings(content_hash);
 CREATE INDEX IF NOT EXISTS idx_listings_seen ON listings(last_seen);
+CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
 
 CREATE TABLE IF NOT EXISTS subscriptions (
     sub_id      TEXT PRIMARY KEY,
@@ -138,6 +140,11 @@ def get_conn() -> sqlite3.Connection:
 
 def init_db():
     conn = get_conn()
+    # Pre-schema migration: the category column arrived after first deploy, and
+    # executescript would otherwise fail on the new index.
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(listings)").fetchall()]
+    if cols and "category" not in cols:
+        conn.execute("ALTER TABLE listings ADD COLUMN category TEXT NOT NULL DEFAULT ''")
     conn.executescript(_SCHEMA)
     conn.commit()
     conn.close()

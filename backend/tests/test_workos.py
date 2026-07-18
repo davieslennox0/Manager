@@ -93,3 +93,13 @@ def test_subscription_capture(client):
     assert dup.status_code == 409
     sub_id = resp.json()["sub_id"]
     assert client.get(f"/v1/unsubscribe/{sub_id}").json()["unsubscribed"] is True
+
+
+def test_category_classifier():
+    assert scanner._tag_category("Senior Security Engineer") == "Security"
+    assert scanner._tag_category("Product Designer") == "Design"
+    assert scanner._tag_category("Solidity Developer") == "Engineering"
+    assert scanner._tag_category("Head of Marketing") == "Marketing & Growth"
+    assert scanner._tag_category("General Counsel") == "Legal & Compliance"
+    assert scanner._tag_category("Chief of Staff") == "Operations & People"
+    assert scanner._tag_category("Wizard of Nothing") == "Other"

@@ -60,7 +60,7 @@ def send_digests(new_listing_ids: list[str]):
                  + (f" ({l['location']})" if l["location"] else "")
                  + f"\n  {l['url']}" for l in hits[:25]]
         body = ("New listings matching your ManagerX filters:\n\n" + "\n".join(lines)
-                + f"\n\nBrowse + one-click tailored CV: {config.PUBLIC_BASE_URL}/jobs"
+                + f"\n\nBrowse + one-click tailored CV: {config.PUBLIC_BASE_URL}/board"
                 + f"\nUnsubscribe: {config.PUBLIC_BASE_URL}/api/unsubscribe/{sub['sub_id']}")
         if config.SMTP_ENABLED:
             try:
