@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getToken } from "../lib/api";
-import { navigate } from "../lib/router";
+import { Link, navigate } from "../lib/router";
 import { explorerTx, sendCreateAgreement, sendSign } from "../lib/wallet";
 
 export default function JobDetail({ jobId }) {
@@ -204,6 +204,19 @@ export default function JobDetail({ jobId }) {
                   onClick={() => run("accept", () => api("POST", `/v1/jobs/${jobId}/accept`))}>
             Mark accepted
           </button>
+        </div>
+      )}
+
+      {(job.status === "accepted" || job.status === "contracted") && (
+        <div className="panel flex items-center gap-4">
+          <div className="flex-1">
+            <h2 className="font-medium">Offer in writing?</h2>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+              Upload the offer or contract they sent — AI review extracts the terms,
+              flags risky clauses, and diffs it against this posting.
+            </p>
+          </div>
+          <Link to="/documents" className="btn">Review it</Link>
         </div>
       )}
 

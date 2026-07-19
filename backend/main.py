@@ -17,6 +17,7 @@ import scanner
 from db import init_db
 from routes.agreement_routes import router as agreement_router
 from routes.auth_routes import router as auth_router
+from routes.document_routes import router as document_router
 from routes.job_routes import router as job_router
 from routes.listing_routes import router as listing_router
 from routes.profile_routes import router as profile_router
@@ -46,8 +47,8 @@ app = FastAPI(title="ManagerX", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 
-for r in (auth_router, profile_router, job_router, agreement_router, listing_router,
-          proof_router, public_router):
+for r in (auth_router, profile_router, job_router, agreement_router, document_router,
+          listing_router, proof_router, public_router):
     app.include_router(r)
 
 

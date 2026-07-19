@@ -3,6 +3,7 @@ import { getToken, setToken } from "./lib/api";
 import { Link, navigate, usePath } from "./lib/router";
 import Agreements from "./pages/Agreements.jsx";
 import Board from "./pages/Board.jsx";
+import Documents from "./pages/Documents.jsx";
 import JobDetail from "./pages/JobDetail.jsx";
 import Jobs from "./pages/Jobs.jsx";
 import Landing from "./pages/Landing.jsx";
@@ -42,6 +43,7 @@ function Nav() {
         {authed && (
           <div className="flex items-center gap-5">
             <Link to="/jobs" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">My applications</Link>
+            <Link to="/documents" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Documents</Link>
             <Link to="/agreements" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Agreements</Link>
             <Link to="/profile" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Profile</Link>
           </div>
@@ -74,6 +76,7 @@ export default function App() {
   else if (path === "/board") page = <Board />;
   else if (path === "/jobs") page = <Jobs />;
   else if (path.startsWith("/job/")) page = <JobDetail jobId={path.split("/")[2]} />;
+  else if (path === "/documents") page = <Documents />;
   else if (path === "/agreements") page = <Agreements />;
   else if (path === "/profile") page = <Profile />;
   else if (path.startsWith("/u/")) page = <TrackRecord handle={path.split("/")[2]} />;

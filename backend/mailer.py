@@ -1,11 +1,15 @@
 """Digest email: plain transactional SMTP, gated off cleanly when SMTP env is
 absent (subscriptions are still captured; sends resume once creds are set)."""
+import datetime
 import json
 import smtplib
 from email.mime.text import MIMEText
 
 import config
 from db import get_conn, j
+
+REMINDER_WINDOW_DAYS = 14   # deadlines this close get an email
+REMINDER_COOLDOWN_DAYS = 7  # per document, at most one reminder a week
 
 
 def _matches(listing, filters: dict) -> bool:
@@ -75,5 +79,52 @@ def send_digests(new_listing_ids: list[str]):
         qmarks = ",".join("?" * len(sent))
         conn.execute(f"UPDATE subscriptions SET last_digest_at=CURRENT_TIMESTAMP "
                      f"WHERE sub_id IN ({qmarks})", sent)
+        conn.commit()
+        conn.close()
+
+
+def send_deadline_reminders():
+    """Email users whose vault documents have obligations coming due (probation
+    ends, offer expiries, contract ends). Rides the scanner tick; a no-op
+    without SMTP creds, and each document reminds at most once per cooldown."""
+    if not config.SMTP_ENABLED:
+        return
+    today = datetime.date.today()
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT d.*, u.email FROM documents d JOIN users u ON u.user_id = d.user_id
+           WHERE d.deadlines != '[]' AND (d.last_reminded_at IS NULL OR
+           strftime('%s','now') - strftime('%s', d.last_reminded_at) >= ?)""",
+        (REMINDER_COOLDOWN_DAYS * 86400,)).fetchall()
+    conn.close()
+
+    reminded = []
+    for row in rows:
+        due = []
+        for d in j(row["deadlines"], []):
+            try:
+                date = datetime.date.fromisoformat(str(d.get("date", "")))
+            except ValueError:
+                continue
+            days = (date - today).days
+            if 0 <= days <= REMINDER_WINDOW_DAYS:
+                due.append(f"- {d.get('label', 'Deadline')}: {date.isoformat()} "
+                           f"({'today' if days == 0 else f'in {days} day(s)'})")
+        if not due:
+            continue
+        name = row["filename"] or f"{row['kind']} document"
+        body = (f"Upcoming obligations from “{name}” in your ManagerX vault:\n\n"
+                + "\n".join(due)
+                + f"\n\nReview the document: {config.PUBLIC_BASE_URL}/documents")
+        try:
+            _send(row["email"], f"ManagerX: {len(due)} deadline(s) coming up", body)
+            reminded.append(row["doc_id"])
+        except Exception:
+            continue  # transient SMTP failure — next pass retries
+    if reminded:
+        conn = get_conn()
+        qmarks = ",".join("?" * len(reminded))
+        conn.execute(f"UPDATE documents SET last_reminded_at=CURRENT_TIMESTAMP "
+                     f"WHERE doc_id IN ({qmarks})", reminded)
         conn.commit()
         conn.close()

@@ -307,12 +307,13 @@ def seed_sources():
 
 async def scanner_loop():
     """Background task started by main.py; digests ride the same tick."""
-    from mailer import send_digests
+    from mailer import send_deadline_reminders, send_digests
     while True:
         try:
             result = await scan_due_sources()
             if result["new_listings"]:
                 await asyncio.to_thread(send_digests, result["new_listings"])
+            await asyncio.to_thread(send_deadline_reminders)
         except Exception:
             pass  # a failing tick must never kill the loop; per-source errors are stored
         await asyncio.sleep(config.SCANNER_TICK_SECONDS)

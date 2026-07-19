@@ -31,3 +31,23 @@ export async function api(method, path, body) {
   }
   return data;
 }
+
+export async function apiUpload(path, formData) {
+  // Multipart upload — the browser sets the boundary; no Content-Type header.
+  const headers = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  let resp;
+  try {
+    resp = await fetch(path, { method: "POST", headers, body: formData });
+  } catch {
+    throw new Error("Could not reach the ManagerX API — check your connection and try again.");
+  }
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    if (resp.status === 401) setToken(null);
+    const detail = data.detail;
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail) || resp.statusText);
+  }
+  return data;
+}

@@ -168,6 +168,28 @@ CREATE TABLE IF NOT EXISTS wallets (
     fetched_at  TIMESTAMP,
     connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ── Document vault ───────────────────────────────────────────────────────
+-- Documents the user RECEIVES (offers, contracts, NDAs): AI-reviewed, hash-
+-- anchored onchain by the user alone — no counterparty signature needed.
+CREATE TABLE IF NOT EXISTS documents (
+    doc_id      TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(user_id),
+    job_id      TEXT REFERENCES jobs(job_id),        -- optional link to the application it answers
+    kind        TEXT NOT NULL DEFAULT 'other',       -- offer | contract | nda | other
+    filename    TEXT NOT NULL DEFAULT '',
+    raw_text    TEXT NOT NULL,                       -- extracted text (review input)
+    doc_hash    TEXT NOT NULL,                       -- 0x sha256 over the uploaded bytes
+    review      TEXT NOT NULL DEFAULT '{}',          -- JSON {terms, red_flags[], posting_diff[], summary}
+    deadlines   TEXT NOT NULL DEFAULT '[]',          -- JSON [{label, date, note}]
+    chain_agreement_id INTEGER,                      -- single-signer SignatureRegistry anchor
+    anchor_tx   TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'uploaded',    -- uploaded | reviewed | anchored
+    last_reminded_at TIMESTAMP,                      -- deadline-email dedup
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
 """
 
 
