@@ -22,6 +22,7 @@ Extract the posting's signals. Reply with ONLY a JSON object:
   "language": "posting language, e.g. 'en'",
   "comp_range": "compensation if disclosed, else ''",
   "duration": "contract/permanent/gig duration if stated, else ''",
+  "apply_email": "email address the posting says to apply to / send CVs to, else ''",
   "summary": "2-sentence summary of what the role actually does"
 }}
 
@@ -76,6 +77,30 @@ Role (parsed posting):
 Candidate profile + verified history:
 {profile}"""
 
+COVER_PROMPT = """You write a short application email for ONE job posting, sent with
+the candidate's tailored CV attached. Rules:
+- 120-180 words, plain text, no placeholders — every sentence must stand as-is.
+- Mirror the posting's tone ({tone}) and language ({language}).
+- Lead with the strongest concrete match between the candidate and the role;
+  never invent skills or experience not in the profile/CV.
+- Close with one plain sentence: the CV is attached, happy to talk.
+- No salutation gymnastics: "Hello," or the hiring team by firm name.
+
+Reply with ONLY a JSON object:
+{{
+  "subject": "Application: <role> — <candidate name>",
+  "body": "the email text, \\n\\n between paragraphs, ending with the candidate's name"
+}}
+
+Job posting signals:
+{parsed}
+
+Tailored CV being attached:
+{cv}
+
+Candidate profile:
+{profile}"""
+
 
 async def fetch_posting_text(url: str) -> str:
     async with httpx.AsyncClient(timeout=30, follow_redirects=True,
@@ -128,6 +153,14 @@ async def tailor_cv(parsed: dict, spine: dict) -> dict:
 async def draft_agreement(parsed: dict, spine: dict) -> dict:
     return await generate_json(AGREEMENT_PROMPT.format(
         parsed=json.dumps(parsed, ensure_ascii=False),
+        profile=json.dumps(spine, ensure_ascii=False)))
+
+
+async def draft_cover_letter(parsed: dict, spine: dict, cv: dict) -> dict:
+    return await generate_json(COVER_PROMPT.format(
+        tone=parsed.get("tone", "neutral"), language=parsed.get("language", "en"),
+        parsed=json.dumps(parsed, ensure_ascii=False),
+        cv=json.dumps(cv, ensure_ascii=False),
         profile=json.dumps(spine, ensure_ascii=False)))
 
 

@@ -186,6 +186,37 @@ function PublicTrackRecord({ profile }) {
   );
 }
 
+function JobAlerts({ profile }) {
+  const [on, setOn] = useState(true);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { setOn(profile.job_alerts !== false); }, [profile.job_alerts]);
+
+  async function toggle() {
+    setMsg("");
+    try {
+      const res = await api("PUT", "/v1/profile/alerts", { enabled: !on });
+      setOn(res.job_alerts);
+    } catch (error) { setMsg(error.message); }
+  }
+
+  return (
+    <div className="panel flex items-center gap-4">
+      <div className="flex-1">
+        <h2 className="font-medium">New-listing alerts</h2>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          When a role that matches your skills hits the board, we email you —
+          with a one-click path to its tailored CV.
+        </p>
+        {msg && <p className="text-xs mt-1 text-red-700 dark:text-red-400">{msg}</p>}
+      </div>
+      <button className={on ? "btn" : "btn-ghost"} onClick={toggle}>
+        {on ? "On" : "Off"}
+      </button>
+    </div>
+  );
+}
+
 export default function Profile() {
   const [p, setP] = useState(null);
   const [msg, setMsg] = useState("");
@@ -315,6 +346,7 @@ export default function Profile() {
       </div>
 
       <PublicTrackRecord profile={p} />
+      <JobAlerts profile={p} />
 
       <div className="panel">
         <h2 className="font-medium mb-3">Verified work history (onchain)</h2>

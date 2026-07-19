@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     education   TEXT NOT NULL DEFAULT '[]',   -- JSON [{degree, school, year}]
     handle      TEXT NOT NULL DEFAULT '',     -- public track-record URL slug, '' = unset
     public_profile INTEGER NOT NULL DEFAULT 0,
+    job_alerts  INTEGER NOT NULL DEFAULT 1,   -- email when a new listing matches the skills
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -56,8 +57,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     listing_id  TEXT,
     url         TEXT NOT NULL DEFAULT '',
     raw_text    TEXT NOT NULL DEFAULT '',
-    parsed      TEXT NOT NULL DEFAULT '{}',          -- JSON {role, firm, skills[], seniority, tone, language}
-    status      TEXT NOT NULL DEFAULT 'parsed',      -- parsed | cv_ready | accepted | contracted
+    parsed      TEXT NOT NULL DEFAULT '{}',          -- JSON {role, firm, skills[], seniority, tone, language, apply_email}
+    status      TEXT NOT NULL DEFAULT 'parsed',      -- parsed | cv_ready | applied | accepted | contracted
+    cover_letter TEXT NOT NULL DEFAULT '',           -- for the email application, user-editable
+    applied_at  TIMESTAMP,                           -- set when the platform emailed the application
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -214,6 +217,12 @@ def init_db():
     if pcols and "handle" not in pcols:
         conn.execute("ALTER TABLE profiles ADD COLUMN handle TEXT NOT NULL DEFAULT ''")
         conn.execute("ALTER TABLE profiles ADD COLUMN public_profile INTEGER NOT NULL DEFAULT 0")
+    if pcols and "job_alerts" not in pcols:
+        conn.execute("ALTER TABLE profiles ADD COLUMN job_alerts INTEGER NOT NULL DEFAULT 1")
+    jcols = [r["name"] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()]
+    if jcols and "cover_letter" not in jcols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN cover_letter TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE jobs ADD COLUMN applied_at TIMESTAMP")
     conn.executescript(_SCHEMA)
     conn.commit()
     conn.close()

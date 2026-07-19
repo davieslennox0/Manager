@@ -1,17 +1,23 @@
 """Per-job flow: submit posting (URL/text/listing) -> parsed signals -> tailored
-CV -> review/edit -> PDF export -> mark accepted (gate to the agreement stage)."""
+CV -> review/edit -> PDF export or email-apply (postings with an application
+address) -> mark accepted (gate to the agreement stage)."""
+import asyncio
 import json
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+import config
 import pipeline
 from auth import current_user
 from db import get_conn, j
 from llm import LLMError
 from pdfgen import render_cv_pdf
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 router = APIRouter(prefix="/v1/jobs", tags=["jobs"])
 
@@ -24,6 +30,11 @@ class JobSubmit(BaseModel):
 
 class CVEdit(BaseModel):
     content: dict
+
+
+class ApplyBody(BaseModel):
+    to_email: str = ""        # defaults to the posting's parsed apply_email
+    cover_letter: str = ""    # defaults to the stored/generated one
 
 
 def _job(conn, job_id: str, user_id: str):
@@ -147,6 +158,78 @@ async def export_cv_pdf(job_id: str, user: dict = Depends(current_user)):
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition":
                              f'attachment; filename="cv-{job_id}.pdf"'})
+
+
+@router.post("/{job_id}/cover-letter")
+async def generate_cover_letter(job_id: str, user: dict = Depends(current_user)):
+    """Draft the application email for this posting from the same spine + the
+    tailored CV; stored on the job, editable before sending."""
+    conn = get_conn()
+    row = _job(conn, job_id, user["user_id"])
+    cv = conn.execute("SELECT content FROM cvs WHERE job_id = ?", (job_id,)).fetchone()
+    conn.close()
+    if not cv:
+        raise HTTPException(422, "Generate the CV first — the letter cites it")
+    try:
+        letter = await pipeline.draft_cover_letter(
+            j(row["parsed"], {}), pipeline.load_spine(user["user_id"]), j(cv["content"], {}))
+    except LLMError as e:
+        raise HTTPException(503, f"Cover letter drafting unavailable: {e}")
+    body = str(letter.get("body", "")).strip()
+    conn = get_conn()
+    conn.execute("UPDATE jobs SET cover_letter=? WHERE job_id=?", (body, job_id))
+    conn.commit()
+    conn.close()
+    return {"job_id": job_id, "subject": letter.get("subject", ""), "cover_letter": body}
+
+
+@router.post("/{job_id}/apply")
+async def email_apply(job_id: str, body: ApplyBody, user: dict = Depends(current_user)):
+    """Send the application from the platform: cover letter as the email body,
+    tailored CV PDF attached, Reply-To the candidate. Only works when the
+    posting exposes an application address (or the user supplies one)."""
+    conn = get_conn()
+    row = _job(conn, job_id, user["user_id"])
+    cv = conn.execute("SELECT content FROM cvs WHERE job_id = ?", (job_id,)).fetchone()
+    conn.close()
+    if not cv:
+        raise HTTPException(422, "Generate the CV first")
+    parsed = j(row["parsed"], {})
+    to_email = (body.to_email or parsed.get("apply_email") or "").strip()
+    if not EMAIL_RE.match(to_email):
+        raise HTTPException(422, "This posting has no application email address — "
+                                 "export the PDF and apply on their site instead")
+    if not config.SMTP_ENABLED:
+        raise HTTPException(503, "Email sending is not configured on this deployment yet")
+    spine = pipeline.load_spine(user["user_id"])
+    letter = body.cover_letter.strip() or row["cover_letter"]
+    subject = f"Application: {parsed.get('role', 'the open role')}"
+    if spine.get("full_name"):
+        subject += f" — {spine['full_name']}"
+    if not letter:
+        try:
+            draft = await pipeline.draft_cover_letter(parsed, spine, j(cv["content"], {}))
+            letter = str(draft.get("body", "")).strip()
+            subject = draft.get("subject") or subject
+        except LLMError as e:
+            raise HTTPException(503, f"Cover letter drafting unavailable: {e}")
+    if not letter:
+        raise HTTPException(422, "Empty cover letter")
+    pdf = render_cv_pdf(j(cv["content"], {}), spine)
+    from mailer import send_application
+    try:
+        await asyncio.to_thread(send_application, to_email, subject, letter, pdf,
+                                f"cv-{job_id}.pdf", user["email"])
+    except Exception as e:
+        raise HTTPException(502, f"SMTP send failed: {e}")
+    conn = get_conn()
+    conn.execute("UPDATE jobs SET cover_letter=?, applied_at=CURRENT_TIMESTAMP, "
+                 "status=CASE WHEN status IN ('parsed','cv_ready') THEN 'applied' "
+                 "ELSE status END WHERE job_id=?", (letter, job_id))
+    conn.commit()
+    conn.close()
+    return {"job_id": job_id, "sent_to": to_email, "subject": subject,
+            "status": "applied", "reply_to": user["email"]}
 
 
 @router.post("/{job_id}/accept")

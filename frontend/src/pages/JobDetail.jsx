@@ -10,11 +10,16 @@ export default function JobDetail({ jobId }) {
   const [busy, setBusy] = useState("");
   const [privacyMode, setPrivacyMode] = useState("HASH_ONLY");
   const [signersText, setSignersText] = useState("");
+  const [applyTo, setApplyTo] = useState("");
+  const [letter, setLetter] = useState("");
+  const [sentTo, setSentTo] = useState("");
 
   async function load() {
     try {
       const jobData = await api("GET", `/v1/jobs/${jobId}`);
       setJob(jobData);
+      setApplyTo((prev) => prev || jobData.parsed?.apply_email || "");
+      setLetter((prev) => prev || jobData.cover_letter || "");
       const all = await api("GET", "/v1/agreements");
       setAgreement(all.agreements.find((a) => a.job_id === jobId) || null);
     } catch (error) {
@@ -189,6 +194,50 @@ export default function JobDetail({ jobId }) {
           </div>
         )}
       </div>
+
+      {/* ── Email-apply (postings with an application address) ──────── */}
+      {cv && (
+        <div className="panel">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="font-medium">Apply by email</h2>
+            {job.applied_at && <span className="tag text-wos-ok dark:text-green-400">sent</span>}
+          </div>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+            {parsed.apply_email
+              ? "This posting accepts email applications — we send the cover letter with your tailored CV attached, replies go straight to your inbox."
+              : "No application address found in this posting — export the PDF and apply on their site, or enter an address if you have one."}
+          </p>
+          <div className="space-y-3">
+            <input className="input max-w-md" placeholder="applications@firm.xyz"
+                   value={applyTo} onChange={(e) => setApplyTo(e.target.value)} />
+            <textarea className="input w-full" rows={7}
+                      placeholder="Cover letter — generate a draft or write your own"
+                      value={letter} onChange={(e) => setLetter(e.target.value)} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button className="btn-ghost" disabled={busy === "letter"}
+                      onClick={() => run("letter", async () => {
+                        const d = await api("POST", `/v1/jobs/${jobId}/cover-letter`);
+                        setLetter(d.cover_letter);
+                      })}>
+                {busy === "letter" ? "Drafting…" : "Draft cover letter"}
+              </button>
+              <button className="btn" disabled={busy === "apply" || !applyTo}
+                      onClick={() => run("apply", async () => {
+                        const d = await api("POST", `/v1/jobs/${jobId}/apply`,
+                          { to_email: applyTo, cover_letter: letter });
+                        setSentTo(d.sent_to);
+                      })}>
+                {busy === "apply" ? "Sending…" : "Send application"}
+              </button>
+              {sentTo && (
+                <span className="text-sm text-wos-ok dark:text-green-400">
+                  Sent to {sentTo} — replies come to your email.
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Offer accepted → agreement ──────────────────────────────── */}
       {job.status !== "accepted" && job.status !== "contracted" && (

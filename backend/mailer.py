@@ -3,6 +3,7 @@ absent (subscriptions are still captured; sends resume once creds are set)."""
 import datetime
 import json
 import smtplib
+from email.message import EmailMessage
 from email.mime.text import MIMEText
 
 import config
@@ -36,6 +37,23 @@ def _send(to_addr: str, subject: str, body: str):
     msg["Subject"] = subject
     msg["From"] = config.SMTP_FROM
     msg["To"] = to_addr
+    with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as server:
+        server.starttls()
+        server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+def send_application(to_addr: str, subject: str, body: str, pdf: bytes,
+                     pdf_name: str, reply_to: str):
+    """One job application: cover letter as the body, tailored CV attached,
+    Reply-To the candidate so the employer answers them, not the platform."""
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = config.SMTP_FROM
+    msg["To"] = to_addr
+    msg["Reply-To"] = reply_to
+    msg.set_content(body)
+    msg.add_attachment(pdf, maintype="application", subtype="pdf", filename=pdf_name)
     with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as server:
         server.starttls()
         server.login(config.SMTP_USER, config.SMTP_PASSWORD)
@@ -81,6 +99,67 @@ def send_digests(new_listing_ids: list[str]):
                      f"WHERE sub_id IN ({qmarks})", sent)
         conn.commit()
         conn.close()
+
+
+def _skill_hits(skills: list[str], blob: str) -> list[str]:
+    """Profile skills present in a listing's text — substring match, but skills
+    shorter than 3 chars ('R', 'Go') need word boundaries to avoid noise."""
+    hits = []
+    words = set(blob.replace("/", " ").replace(",", " ").split())
+    for skill in skills:
+        s = skill.strip().lower()
+        if not s:
+            continue
+        if (s in blob if len(s) >= 3 else s in words):
+            hits.append(skill.strip())
+    return hits
+
+
+def send_job_match_alerts(new_listing_ids: list[str]):
+    """Personalized version of the digest: when a listing that just entered the
+    board overlaps a user's profile skills, tell them. Opt-out via the
+    job_alerts toggle on the profile; a no-op without SMTP creds."""
+    if not new_listing_ids or not config.SMTP_ENABLED:
+        return
+    conn = get_conn()
+    qmarks = ",".join("?" * len(new_listing_ids))
+    listings = conn.execute(
+        f"SELECT * FROM listings WHERE listing_id IN ({qmarks})", new_listing_ids).fetchall()
+    users = conn.execute(
+        """SELECT p.user_id, p.skills, p.headline, u.email FROM profiles p
+           JOIN users u ON u.user_id = p.user_id
+           WHERE p.job_alerts = 1 AND p.skills != '[]'""").fetchall()
+    conn.close()
+    if not listings or not users:
+        return
+
+    for user in users:
+        skills = [s for s in j(user["skills"], []) if isinstance(s, str)]
+        if not skills:
+            continue
+        matches = []
+        for listing in listings:
+            blob = " ".join([listing["role"], listing["firm"], listing["ecosystem"],
+                             listing["category"], listing["location"],
+                             " ".join(j(listing["skills"], []))]).lower()
+            hits = _skill_hits(skills, blob)
+            if len(hits) >= min(2, len(skills)):
+                matches.append((listing, hits))
+        if not matches:
+            continue
+        lines = [f"- {l['role']} @ {l['firm'] or 'unnamed firm'}"
+                 + (f" [{l['ecosystem']}]" if l["ecosystem"] else "")
+                 + f"\n  matches your skills: {', '.join(h[:5])}"
+                 + f"\n  {l['url']}" for l, h in matches[:10]]
+        body = ("A role matching your ManagerX profile just hit the board:\n\n"
+                + "\n".join(lines)
+                + f"\n\nOne-click tailored CV: {config.PUBLIC_BASE_URL}/board"
+                + f"\nTurn these alerts off in your profile: {config.PUBLIC_BASE_URL}/profile")
+        try:
+            _send(user["email"],
+                  f"ManagerX: {len(matches)} new role(s) matching your profile", body)
+        except Exception:
+            continue  # transient SMTP failure — alerts are best-effort
 
 
 def send_deadline_reminders():

@@ -21,19 +21,35 @@ class ProfileBody(BaseModel):
     education: list[dict] = []
 
 
+class AlertsBody(BaseModel):
+    enabled: bool
+
+
 @router.get("")
 async def get_profile(user: dict = Depends(current_user)):
     """The full data spine: base profile + verified onchain work history,
     plus the public track-record settings (handle + toggle)."""
     spine = load_spine(user["user_id"])
     conn = get_conn()
-    row = conn.execute("SELECT handle, public_profile FROM profiles WHERE user_id=?",
-                       (user["user_id"],)).fetchone()
+    row = conn.execute("SELECT handle, public_profile, job_alerts FROM profiles "
+                       "WHERE user_id=?", (user["user_id"],)).fetchone()
     conn.close()
     if row:
         spine["handle"] = row["handle"]
         spine["public_profile"] = bool(row["public_profile"])
+        spine["job_alerts"] = bool(row["job_alerts"])
     return spine
+
+
+@router.put("/alerts")
+async def set_job_alerts(body: AlertsBody, user: dict = Depends(current_user)):
+    """Toggle the new-listing match emails (on by default)."""
+    conn = get_conn()
+    conn.execute("UPDATE profiles SET job_alerts=? WHERE user_id=?",
+                 (1 if body.enabled else 0, user["user_id"]))
+    conn.commit()
+    conn.close()
+    return {"job_alerts": body.enabled}
 
 
 @router.put("")
