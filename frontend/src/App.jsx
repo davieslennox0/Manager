@@ -95,7 +95,7 @@ export default function App() {
           <a href="/#features" className="hover:text-black dark:hover:text-white">Features</a>
           <a href="/#how" className="hover:text-black dark:hover:text-white">How it works</a>
           <span className="ml-auto">
-            Agreements sign onchain via SignatureRegistry · X Layer (196)
+            Documents anchor onchain via SignatureRegistry · X Layer (196)
           </span>
         </div>
       </footer>

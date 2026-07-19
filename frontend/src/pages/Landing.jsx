@@ -14,23 +14,23 @@ const FEATURES = [
     body: "Pick a posting and ManagerX generates a CV tailored to exactly it: your skills reordered to mirror the listing's own language, irrelevant experience dropped. Nothing invented — it only draws from your profile. Review, edit, export as PDF.",
   },
   {
-    tag: "contract",
-    title: "Offers become onchain agreements",
-    body: "When a role converts, the work agreement drafts itself from the same profile data — claimed skills become scope-of-work clauses. Both parties sign with their wallets; the signed record lives on X Layer, hash-only or with metadata, your choice.",
+    tag: "review",
+    title: "The offer gets read before you sign",
+    body: "Upload the offer, contract, or NDA they sent. ManagerX extracts the terms, flags risky clauses with a concrete counter-ask for each, pulls every deadline — and diffs the document against the posting you applied to, because we hold what was promised.",
   },
   {
-    tag: "compound",
+    tag: "prove",
     title: "Track record you can prove",
-    body: "A fully-executed agreement writes back into your profile as verified work history — signed, timestamped, checkable by anyone. Future CVs cite it as unfakeable evidence. Every job you complete makes the next application stronger.",
+    body: "Anchor any document's hash onchain from your wallet — a timestamped, tamper-evident record of exactly what you were sent, checkable by anyone against the original file. No counterparty needed. Every anchored document strengthens the next application.",
   },
 ];
 
 const STEPS = [
   ["Build your profile", "Skills, experience, education — entered once, the spine of everything."],
   ["Pick or paste a job", "From the scanned board, or paste any posting URL or text."],
-  ["Get the tailored CV", "Generated for that posting alone. Edit, export PDF, apply."],
-  ["Accept the offer", "Mark it accepted — the work agreement drafts from the same data."],
-  ["Sign onchain", "Both wallets sign; execution lands in your verified history."],
+  ["Get the tailored CV", "Generated for that posting alone. Edit, export PDF — the application is yours to send, we just make it sharp."],
+  ["Upload what they send back", "Offer, contract, NDA — AI review extracts the terms, flags the traps, and diffs it against the posting."],
+  ["Anchor it onchain", "One wallet transaction stamps the document hash on X Layer — proof of what you were sent, forever."],
 ];
 
 export default function Landing() {
@@ -48,7 +48,7 @@ export default function Landing() {
       {/* ── Hero ────────────────────────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-4 pt-20 pb-16">
         <p className="font-mono text-xs uppercase tracking-widest text-neutral-500 mb-4">
-          Job → tailored CV → offer → onchain agreement → proof
+          Job → tailored CV → offer review → anchored proof
         </p>
         <h1 className="text-5xl sm:text-6xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
           Your next Web3 role,
@@ -57,8 +57,8 @@ export default function Landing() {
         </h1>
         <p className="text-lg text-neutral-600 dark:text-neutral-400 mt-6 max-w-2xl">
           ManagerX scans the Web3 job market, writes a CV tuned to each posting from
-          your one profile, and — when the offer lands — turns it into a work
-          agreement signed onchain. Finished work becomes verifiable track record.
+          your one profile, and — when the offer lands — reads every clause before
+          you sign it. Anchored documents become verifiable track record.
         </p>
         <div className="flex flex-wrap gap-3 mt-8">
           <Link to={authed ? "/jobs" : "/signup"}
@@ -121,11 +121,11 @@ export default function Landing() {
         <div className="max-w-5xl mx-auto px-4 py-10">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[260px]">
-              <h3 className="font-medium">Signatures are real transactions.</h3>
+              <h3 className="font-medium">Anchors are real transactions.</h3>
               <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                Agreements live in the SignatureRegistry contract on X Layer (chain 196).
-                Every signature is a wallet transaction; every executed agreement is
-                independently verifiable against the document hash.
+                Document hashes live in the SignatureRegistry contract on X Layer
+                (chain 196). Every anchor is a transaction from your own wallet;
+                anyone can verify a document against its onchain hash.
               </p>
             </div>
             <a className="font-mono text-xs underline break-all"
@@ -144,8 +144,8 @@ export default function Landing() {
             Start with your profile.
           </h2>
           <p className="text-neutral-600 dark:text-neutral-400 mt-3 max-w-xl mx-auto">
-            Ten minutes of setup, then every application and every contract is a
-            projection of the same data — and every finished job strengthens it.
+            Ten minutes of setup, then every application and every offer review is a
+            projection of the same data — and every anchored document strengthens it.
           </p>
           <Link to={authed ? "/profile" : "/signup"}
                 className="btn !px-10 !py-4 !text-base !rounded-xl inline-block mt-7">
