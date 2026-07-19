@@ -72,6 +72,47 @@ def render_cv_pdf(cv: dict, profile: dict) -> bytes:
                 pdf.multi_cell(w - 4, 5, _latin(f"• {b}"))
             pdf.ln(1)
 
+    # Proof-of-work layer: repos the matching step ranked relevant to THIS
+    # posting, plus the verified onchain footprint.
+    if cv.get("relevant_work"):
+        section("Relevant Work — Proof")
+        for rw in cv["relevant_work"]:
+            pdf.set_font("Helvetica", "B", 10.5)
+            head = rw.get("repo", "")
+            if rw.get("language"):
+                head += f"  ({rw['language']})"
+            pdf.cell(w, 5.5, _latin(head), new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("Helvetica", "", 10)
+            if rw.get("proof_point"):
+                pdf.set_x(MARGIN + 4)
+                pdf.multi_cell(w - 4, 5, _latin(f"• {rw['proof_point']}"))
+            for vc in rw.get("verified_contracts", []):
+                pdf.set_x(MARGIN + 4)
+                pdf.multi_cell(w - 4, 5, _latin(
+                    f"• Deployed contract (verified, {vc.get('chain', '')}): "
+                    f"{vc.get('address', '')}"))
+            if rw.get("url"):
+                pdf.set_text_color(90, 90, 90)
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_x(MARGIN + 4)
+                pdf.cell(w - 4, 4.5, _latin(rw["url"]), new_x="LMARGIN", new_y="NEXT")
+                pdf.set_text_color(0, 0, 0)
+            pdf.ln(1)
+
+    footprint = cv.get("onchain_footprint") or {}
+    claim = (footprint.get("platform") or {}).get("claim", "")
+    if claim or footprint.get("dao_votes"):
+        section("Onchain Footprint")
+        pdf.set_font("Helvetica", "", 10)
+        lines = []
+        if claim:
+            lines.append(f"{claim} — signed via SignatureRegistry on X Layer.")
+        if footprint.get("dao_votes"):
+            spaces = ", ".join(footprint.get("dao_spaces", [])[:5])
+            lines.append(f"{footprint['dao_votes']} DAO votes on Snapshot"
+                         + (f" ({spaces})" if spaces else ""))
+        pdf.multi_cell(w, 5, _latin("  ·  ".join(lines)))
+
     if cv.get("education"):
         section("Education")
         pdf.set_font("Helvetica", "", 10)

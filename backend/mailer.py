@@ -16,6 +16,8 @@ def _matches(listing, filters: dict) -> bool:
     eco = (filters.get("ecosystem") or "").lower()
     if eco and eco not in blob:
         return False
+    if filters.get("newly_funded") and not listing["newly_funded"]:
+        return False
     role_kw = [k.lower() for k in filters.get("role_keywords", []) if k]
     if role_kw and not any(k in listing["role"].lower() for k in role_kw):
         return False

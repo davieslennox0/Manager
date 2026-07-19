@@ -8,6 +8,7 @@ import Jobs from "./pages/Jobs.jsx";
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Profile from "./pages/Profile.jsx";
+import TrackRecord from "./pages/TrackRecord.jsx";
 
 function ThemeToggle() {
   const [dark, setDark] = useState(document.documentElement.classList.contains("dark"));
@@ -75,6 +76,7 @@ export default function App() {
   else if (path.startsWith("/job/")) page = <JobDetail jobId={path.split("/")[2]} />;
   else if (path === "/agreements") page = <Agreements />;
   else if (path === "/profile") page = <Profile />;
+  else if (path.startsWith("/u/")) page = <TrackRecord handle={path.split("/")[2]} />;
   else page = <Landing />;
   const landing = page.type === Landing;
   return (

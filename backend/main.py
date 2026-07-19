@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 import auth
 import config
+import funding
 import scanner
 from db import init_db
 from routes.agreement_routes import router as agreement_router
@@ -19,6 +20,8 @@ from routes.auth_routes import router as auth_router
 from routes.job_routes import router as job_router
 from routes.listing_routes import router as listing_router
 from routes.profile_routes import router as profile_router
+from routes.proof_routes import router as proof_router
+from routes.public_routes import router as public_router
 
 STATIC_DIR = Path(__file__).parent.parent / "frontend" / "dist"
 
@@ -29,11 +32,13 @@ async def lifespan(app: FastAPI):
     auth.seed_admin()
     scanner.seed_sources()
     scanner.backfill_categories()
-    task = None
+    tasks = []
     if config.SCANNER_ENABLED:
-        task = asyncio.create_task(scanner.scanner_loop())
+        tasks.append(asyncio.create_task(scanner.scanner_loop()))
+    if config.FUNDING_ENABLED:
+        tasks.append(asyncio.create_task(funding.funding_loop()))
     yield
-    if task:
+    for task in tasks:
         task.cancel()
 
 
@@ -41,7 +46,8 @@ app = FastAPI(title="ManagerX", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 
-for r in (auth_router, profile_router, job_router, agreement_router, listing_router):
+for r in (auth_router, profile_router, job_router, agreement_router, listing_router,
+          proof_router, public_router):
     app.include_router(r)
 
 
@@ -51,7 +57,9 @@ async def health():
             "chain_id": config.CHAIN_ID,
             "registry": config.REGISTRY_ADDRESS or None,
             "scanner": config.SCANNER_ENABLED,
-            "smtp": config.SMTP_ENABLED}
+            "smtp": config.SMTP_ENABLED,
+            "funding": config.FUNDING_ENABLED,
+            "github_oauth": config.GITHUB_OAUTH_ENABLED}
 
 
 if STATIC_DIR.is_dir():

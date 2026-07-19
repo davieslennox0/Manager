@@ -23,8 +23,17 @@ class ProfileBody(BaseModel):
 
 @router.get("")
 async def get_profile(user: dict = Depends(current_user)):
-    """The full data spine: base profile + verified onchain work history."""
-    return load_spine(user["user_id"])
+    """The full data spine: base profile + verified onchain work history,
+    plus the public track-record settings (handle + toggle)."""
+    spine = load_spine(user["user_id"])
+    conn = get_conn()
+    row = conn.execute("SELECT handle, public_profile FROM profiles WHERE user_id=?",
+                       (user["user_id"],)).fetchone()
+    conn.close()
+    if row:
+        spine["handle"] = row["handle"]
+        spine["public_profile"] = bool(row["public_profile"])
+    return spine
 
 
 @router.put("")

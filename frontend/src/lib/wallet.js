@@ -61,6 +61,19 @@ export async function sendCreateAgreement(txRequest) {
   return { txHash: receipt.hash, chainAgreementId: Number(created.args.id) };
 }
 
+export async function signMessage(message) {
+  // Plain personal_sign — proves address ownership for the proof-of-work
+  // layer. No chain switch needed; nothing goes onchain.
+  if (!window.ethereum) {
+    throw new Error("No browser wallet found — install OKX Wallet or MetaMask.");
+  }
+  const [address] = await window.ethereum.request({ method: "eth_requestAccounts" });
+  const provider = new BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner(address);
+  const signature = await signer.signMessage(message);
+  return { address, signature };
+}
+
 export async function sendSign(registryAddress, chainAgreementId) {
   const { signer } = await connectWallet(196);
   const registry = new Contract(registryAddress, REGISTRY_ABI, signer);

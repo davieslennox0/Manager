@@ -4,15 +4,18 @@ import { navigate } from "../lib/router";
 
 export default function Board() {
   const [data, setData] = useState({ total: 0, listings: [],
-                                     facets: { ecosystems: [], categories: [] } });
+                                     facets: { ecosystems: [], categories: [], newly_funded: 0 } });
   const [q, setQ] = useState("");
   const [eco, setEco] = useState("");
   const [remote, setRemote] = useState("");
   const [category, setCategory] = useState("");
+  const [funded, setFunded] = useState(false);
+  const [fundedFirms, setFundedFirms] = useState(null);
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState("");
   const [subEmail, setSubEmail] = useState("");
   const [subKeywords, setSubKeywords] = useState("");
+  const [subFunded, setSubFunded] = useState(false);
   const [subMsg, setSubMsg] = useState("");
 
   async function load() {
@@ -21,13 +24,19 @@ export default function Board() {
     if (eco) params.set("ecosystem", eco);
     if (remote) params.set("remote", remote);
     if (category) params.set("category", category);
+    if (funded) params.set("newly_funded", "1");
     try {
       setData(await api("GET", `/v1/listings?${params}`));
     } catch (error) {
       setErr(error.message);
     }
   }
-  useEffect(() => { load(); }, [eco, remote, category]);
+  useEffect(() => { load(); }, [eco, remote, category, funded]);
+  useEffect(() => {
+    if (funded && fundedFirms === null) {
+      api("GET", "/v1/funded").then(setFundedFirms).catch(() => setFundedFirms({ speculative: [] }));
+    }
+  }, [funded]);
 
   async function tailor(listing) {
     if (!getToken()) {
@@ -54,6 +63,7 @@ export default function Board() {
         ecosystem: eco,
         role_keywords: category ? [category.split(" ")[0]] : [],
         keywords: subKeywords.split(",").map((s) => s.trim()).filter(Boolean),
+        newly_funded: subFunded || funded,
       });
       setSubMsg("Subscribed — digests send as matching listings appear.");
     } catch (error) {
@@ -89,7 +99,23 @@ export default function Board() {
             {f.name} <span className="opacity-60">({f.count})</span>
           </button>
         ))}
+        <button onClick={() => setFunded(!funded)}
+                title="Firms that just closed a raise are staffing up — catch roles before they're widely posted."
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors font-medium ${
+                  funded ? "bg-green-700 text-white border-green-700"
+                         : "border-green-700/50 text-green-800 dark:text-green-400 hover:border-green-600"}`}>
+          ⚡ Newly funded {data.facets.newly_funded > 0 && (
+            <span className="opacity-70">({data.facets.newly_funded})</span>)}
+        </button>
       </div>
+
+      {funded && (
+        <p className="text-sm text-green-800 dark:text-green-400 mb-4 -mt-1">
+          <span className="font-medium">The edge:</span> these firms announced a raise
+          in the last 90 days — fresh budget, fresh headcount. Apply before the crowd
+          finds the posting.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-3 mb-5">
         <input className="input max-w-xs" placeholder="Search role, firm, skill…"
@@ -123,6 +149,11 @@ export default function Board() {
                 {listing.comp_range && ` · ${listing.comp_range}`}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
+                {!!listing.newly_funded && (
+                  <span className="tag font-medium !border-green-700/50 text-green-800 dark:text-green-400">
+                    ⚡ newly funded
+                  </span>
+                )}
                 {listing.category && <span className="tag font-medium">{listing.category}</span>}
                 {listing.ecosystem && <span className="tag">{listing.ecosystem}</span>}
                 {listing.skills.slice(0, 5).map((s) => <span key={s} className="tag">{s}</span>)}
@@ -144,6 +175,33 @@ export default function Board() {
         )}
       </div>
 
+      {funded && fundedFirms && (fundedFirms.speculative || []).length > 0 && (
+        <div className="mt-8">
+          <h2 className="font-medium">Recently funded — likely hiring soon</h2>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+            Raise announced, no public posting yet. A cold intro now beats a hundred
+            applicants later.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {fundedFirms.speculative.slice(0, 12).map((f) => (
+              <div key={f.name} className="card-inner">
+                <div className="font-medium text-sm">{f.name}</div>
+                <div className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
+                  {[f.round, f.amount && `raised ${f.amount}`, f.announced_at && f.announced_at.slice(0, 11)]
+                    .filter(Boolean).join(" · ")}
+                </div>
+                {f.source_url && (
+                  <a className="text-xs underline text-neutral-500 hover:text-black dark:hover:text-white"
+                     href={f.source_url} target="_blank" rel="noreferrer">
+                    Funding coverage ↗
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="panel mt-10 max-w-xl">
         <h2 className="font-medium mb-1">Email digests</h2>
         <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
@@ -155,6 +213,11 @@ export default function Board() {
                  value={subEmail} onChange={(e) => setSubEmail(e.target.value)} />
           <input className="input max-w-[220px]" placeholder="keywords, comma-separated"
                  value={subKeywords} onChange={(e) => setSubKeywords(e.target.value)} />
+          <label className="flex items-center gap-1.5 text-sm text-neutral-700 dark:text-neutral-300 select-none">
+            <input type="checkbox" checked={subFunded || funded}
+                   onChange={(e) => setSubFunded(e.target.checked)} />
+            newly-funded firms only
+          </label>
           <button className="btn">Subscribe</button>
         </form>
         {subMsg && <p className="text-sm mt-2">{subMsg}</p>}

@@ -18,11 +18,12 @@ class SubscribeBody(BaseModel):
     ecosystem: str = ""
     role_keywords: list[str] = []
     keywords: list[str] = []
+    newly_funded: bool = False
 
 
 @router.get("/listings")
 async def listings(q: str = "", ecosystem: str = "", firm: str = "", remote: str = "",
-                   category: str = "",
+                   category: str = "", newly_funded: str = "",
                    limit: int = Query(100, le=500), offset: int = 0):
     where, args = ["active = 1"], []
     if q:
@@ -40,6 +41,8 @@ async def listings(q: str = "", ecosystem: str = "", firm: str = "", remote: str
     if category:
         where.append("category = ?")
         args.append(category)
+    if newly_funded:
+        where.append("newly_funded = 1")
     conn = get_conn()
     rows = conn.execute(
         f"SELECT * FROM listings WHERE {' AND '.join(where)} "
@@ -52,13 +55,33 @@ async def listings(q: str = "", ecosystem: str = "", firm: str = "", remote: str
     cat_facets = conn.execute(
         "SELECT category, COUNT(*) c FROM listings WHERE active=1 AND category != '' "
         "GROUP BY category ORDER BY c DESC").fetchall()
+    funded_count = conn.execute(
+        "SELECT COUNT(*) c FROM listings WHERE active=1 AND newly_funded=1").fetchone()["c"]
     conn.close()
     return {"total": total,
             "facets": {
                 "ecosystems": [{"name": f["ecosystem"], "count": f["c"]} for f in eco_facets],
                 "categories": [{"name": f["category"], "count": f["c"]} for f in cat_facets],
+                "newly_funded": funded_count,
             },
             "listings": [{**dict(r), "skills": j(r["skills"], [])} for r in rows]}
+
+
+@router.get("/funded")
+async def funded_firms():
+    """The newly-funded tiers: firms with live listings ("hiring") and the
+    speculative tier — recently funded, likely hiring soon, no posting yet."""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT name, round, amount, announced_at, source_url, careers_kind,
+           careers_target, status, first_seen FROM funded_firms
+           WHERE active=1 ORDER BY first_seen DESC LIMIT 100""").fetchall()
+    conn.close()
+    firms = [dict(r) for r in rows]
+    return {"hiring": [f for f in firms if f["status"] == "hiring"],
+            "speculative": [f for f in firms if f["status"] == "speculative"],
+            "note": "speculative = raise announced but no public posting yet — "
+                    "reach out before the role hits the boards"}
 
 
 @router.get("/listings/{listing_id}")
@@ -75,7 +98,8 @@ async def get_listing(listing_id: str):
 async def subscribe(body: SubscribeBody):
     filters = {k: v for k, v in [("ecosystem", body.ecosystem),
                                  ("role_keywords", body.role_keywords),
-                                 ("keywords", body.keywords)] if v}
+                                 ("keywords", body.keywords),
+                                 ("newly_funded", body.newly_funded)] if v}
     conn = get_conn()
     try:
         sub_id = "sub_" + uuid.uuid4().hex[:12]

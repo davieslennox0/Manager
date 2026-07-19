@@ -95,6 +95,11 @@ export default function JobDetail({ jobId }) {
             </button>
             {cv && (
               <>
+                <button className="btn-ghost" disabled={busy === "proof"}
+                        title="LLM-ranks your connected GitHub repos + onchain history against THIS posting"
+                        onClick={() => run("proof", () => api("POST", `/v1/proof/jobs/${jobId}/match`))}>
+                  {busy === "proof" ? "Matching…" : "Match proof-of-work"}
+                </button>
                 <button className="btn-ghost" disabled={busy === "save"}
                         onClick={() => run("save", () => api("PUT", `/v1/jobs/${jobId}/cv`, { content: cv }))}>
                   Save edits
@@ -144,6 +149,43 @@ export default function JobDetail({ jobId }) {
                           }} />
               </div>
             ))}
+
+            {(cv.relevant_work || []).length > 0 && (
+              <div>
+                <label className="label">Relevant work — proof (matched to this posting)</label>
+                <div className="space-y-2">
+                  {cv.relevant_work.map((rw) => (
+                    <div key={rw.repo} className="card-inner">
+                      <div className="text-sm font-medium">
+                        <a className="underline" href={rw.url} target="_blank" rel="noreferrer">
+                          {rw.repo}
+                        </a>
+                        {rw.pinned && <span className="tag ml-2">pinned</span>}
+                        {rw.language && <span className="text-neutral-500 font-normal ml-2">{rw.language}</span>}
+                        {rw.stars > 0 && <span className="text-neutral-500 font-normal ml-2">★ {rw.stars}</span>}
+                      </div>
+                      {rw.why && <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">{rw.why}</p>}
+                      {rw.proof_point && <p className="text-xs mt-1">Proof point: {rw.proof_point}</p>}
+                      {(rw.verified_contracts || []).map((vc) => (
+                        <p key={vc.address} className="text-xs font-mono mt-1 break-all">
+                          <a className="underline" href={vc.explorer_url} target="_blank" rel="noreferrer">
+                            {vc.address}
+                          </a>
+                          <span className="text-wos-ok dark:text-green-400 ml-2">
+                            deployed on {vc.chain} ✓
+                          </span>
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {cv.onchain_footprint?.platform?.claim && (
+              <p className="text-sm text-wos-ok dark:text-green-400">
+                {cv.onchain_footprint.platform.claim} — auto-attached to the CV.
+              </p>
+            )}
           </div>
         )}
       </div>

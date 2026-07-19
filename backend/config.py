@@ -43,3 +43,19 @@ SMTP_ENABLED = bool(SMTP_HOST and SMTP_USER and SMTP_PASSWORD)
 
 SCANNER_ENABLED = os.getenv("SCANNER_ENABLED", "1") == "1"
 SCANNER_TICK_SECONDS = int(os.getenv("SCANNER_TICK_SECONDS", "300"))
+
+# Newly-funded pipeline: funding feeds poll on their own (slower) loop; a firm
+# counts as "newly funded" for FRESH_DAYS after its announcement.
+FUNDING_ENABLED = os.getenv("FUNDING_ENABLED", "1") == "1"
+FUNDING_TICK_SECONDS = int(os.getenv("FUNDING_TICK_SECONDS", "21600"))
+FUNDING_FRESH_DAYS = int(os.getenv("FUNDING_FRESH_DAYS", "90"))
+
+# GitHub OAuth for the proof-of-work CV layer. Unset -> the OAuth button hides
+# and users connect in public-data mode (public repos only, no token stored).
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
+GITHUB_OAUTH_ENABLED = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET)
+
+# Read-side RPCs for wallet-footprint lookups beyond X Layer.
+ETH_RPC_URL = os.getenv("ETH_RPC_URL", "https://cloudflare-eth.com")
+SNAPSHOT_HUB_URL = os.getenv("SNAPSHOT_HUB_URL", "https://hub.snapshot.org/graphql")

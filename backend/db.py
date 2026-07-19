@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS profiles (
     skills      TEXT NOT NULL DEFAULT '[]',   -- JSON [str]
     experience  TEXT NOT NULL DEFAULT '[]',   -- JSON [{title, org, start, end, bullets[]}]
     education   TEXT NOT NULL DEFAULT '[]',   -- JSON [{degree, school, year}]
+    handle      TEXT NOT NULL DEFAULT '',     -- public track-record URL slug, '' = unset
+    public_profile INTEGER NOT NULL DEFAULT 0,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -109,6 +111,7 @@ CREATE TABLE IF NOT EXISTS listings (
     url         TEXT NOT NULL,
     posted_at   TEXT NOT NULL DEFAULT '',
     category    TEXT NOT NULL DEFAULT '',            -- Engineering / Design / … (scanner classifier)
+    newly_funded INTEGER NOT NULL DEFAULT 0,         -- funding.apply_funded_tags maintains this
     content_hash TEXT NOT NULL,                      -- dedup key across sources
     first_seen  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -121,12 +124,50 @@ CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
 CREATE TABLE IF NOT EXISTS subscriptions (
     sub_id      TEXT PRIMARY KEY,
     email       TEXT NOT NULL,
-    filters     TEXT NOT NULL DEFAULT '{}',          -- JSON {ecosystem?, role_keywords[]?, keywords[]?}
+    filters     TEXT NOT NULL DEFAULT '{}',          -- JSON {ecosystem?, role_keywords[]?, keywords[]?, newly_funded?}
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_digest_at TIMESTAMP,
     active      INTEGER NOT NULL DEFAULT 1
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_subs_email_filters ON subscriptions(email, filters);
+
+-- ── Newly-funded pipeline ────────────────────────────────────────────────
+-- Firms detected in funding feeds. status flips speculative -> hiring the
+-- moment a listing for the firm shows up in the compiled feed.
+CREATE TABLE IF NOT EXISTS funded_firms (
+    firm_id     TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    normalized  TEXT NOT NULL,                       -- lowercase dedup/matching key
+    round       TEXT NOT NULL DEFAULT '',
+    amount      TEXT NOT NULL DEFAULT '',
+    announced_at TEXT NOT NULL DEFAULT '',
+    source_url  TEXT NOT NULL DEFAULT '',
+    careers_kind TEXT NOT NULL DEFAULT '',           -- greenhouse | lever | '' none found
+    careers_target TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'speculative', -- speculative | hiring
+    first_seen  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    careers_checked_at TIMESTAMP,
+    active      INTEGER NOT NULL DEFAULT 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_funded_normalized ON funded_firms(normalized);
+
+-- ── Proof-of-work sources ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS github_accounts (
+    user_id     TEXT PRIMARY KEY REFERENCES users(user_id),
+    username    TEXT NOT NULL,
+    access_token TEXT NOT NULL DEFAULT '',           -- '' = public-data mode (no OAuth)
+    repos       TEXT NOT NULL DEFAULT '[]',          -- cached normalized repo list JSON
+    fetched_at  TIMESTAMP,
+    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wallets (
+    user_id     TEXT PRIMARY KEY REFERENCES users(user_id),
+    address     TEXT NOT NULL,                       -- checksummed; ownership proven by signature
+    activity    TEXT NOT NULL DEFAULT '{}',          -- cached onchain footprint JSON
+    fetched_at  TIMESTAMP,
+    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -145,6 +186,12 @@ def init_db():
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(listings)").fetchall()]
     if cols and "category" not in cols:
         conn.execute("ALTER TABLE listings ADD COLUMN category TEXT NOT NULL DEFAULT ''")
+    if cols and "newly_funded" not in cols:
+        conn.execute("ALTER TABLE listings ADD COLUMN newly_funded INTEGER NOT NULL DEFAULT 0")
+    pcols = [r["name"] for r in conn.execute("PRAGMA table_info(profiles)").fetchall()]
+    if pcols and "handle" not in pcols:
+        conn.execute("ALTER TABLE profiles ADD COLUMN handle TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE profiles ADD COLUMN public_profile INTEGER NOT NULL DEFAULT 0")
     conn.executescript(_SCHEMA)
     conn.commit()
     conn.close()
