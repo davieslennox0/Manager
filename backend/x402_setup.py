@@ -117,6 +117,27 @@ _USAGE = {
         "returns": "{subject, body (120-180 word application email), cv}",
         "billing": "0.1 USDT0 per call (X Layer / USDT0, EIP-3009 exact scheme)",
     },
+    # Base/USDC rail (CDP facilitator, x402 Bazaar) — same services, USDC on Base.
+    "/v1/base/benchmark": {
+        "method": "POST", "content_type": "application/json",
+        "body": {"resume_text": "résumé as plain text (required)",
+                 "posting_text": "job posting text; OR posting/role+required_skills"},
+        "returns": "overall_score, verdict, role_fit, ats, positioning[]",
+        "billing": "0.1 USDC per call (Base / USDC, CDP facilitator)",
+    },
+    "/v1/base/tailor": {
+        "method": "POST", "content_type": "application/json",
+        "body": {"profile": "candidate profile object", "posting_text": "posting text"},
+        "returns": "{parsed, cv}",
+        "billing": "0.1 USDC per call (Base / USDC, CDP facilitator)",
+    },
+    "/v1/base/cover-letter": {
+        "method": "POST", "content_type": "application/json",
+        "body": {"profile": "candidate profile object", "posting_text": "posting text",
+                 "cv": "optional tailored CV"},
+        "returns": "{subject, body, cv}",
+        "billing": "0.1 USDC per call (Base / USDC, CDP facilitator)",
+    },
 }
 
 

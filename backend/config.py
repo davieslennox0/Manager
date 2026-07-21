@@ -35,6 +35,19 @@ X402_OPERATOR_KEY = os.getenv("OPERATOR_WALLET_PRIVATE_KEY", "")
 X402_USDT_CONTRACT = os.getenv("XLAYER_X402_USDT_CONTRACT_ADDRESS", "")
 X402_ENABLED = bool(X402_PAY_TO and X402_OPERATOR_KEY and X402_USDT_CONTRACT)
 
+# Second x402 rail: Base/USDC settled through Coinbase's CDP Facilitator. This is
+# the ONLY way into the x402 Bazaar discovery index (Bazaar can't see our
+# self-hosted X Layer/USDT0 rail). Inert until the CDP API key lands — the X Layer
+# rail (OKX #7120) is unaffected. Needs `pip install cdp-sdk` for request auth.
+CDP_FACILITATOR_URL = os.getenv("CDP_FACILITATOR_URL",
+                                "https://api.cdp.coinbase.com/platform/v2/x402")
+CDP_API_KEY_ID = os.getenv("CDP_API_KEY_ID", "")
+CDP_API_KEY_SECRET = os.getenv("CDP_API_KEY_SECRET", "")
+BASE_X402_PAY_TO = os.getenv("BASE_X402_PAY_TO", "")   # EVM addr to receive USDC on Base
+BASE_USDC_CONTRACT = os.getenv("BASE_USDC_CONTRACT",
+                               "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")  # USDC on Base
+X402_CDP_ENABLED = bool(CDP_API_KEY_ID and CDP_API_KEY_SECRET and BASE_X402_PAY_TO)
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")

@@ -17,6 +17,7 @@ import scanner
 from db import init_db
 from routes.agent_jobs_routes import router as agent_jobs_router
 from routes.agentic_routes import router as agentic_router
+from routes.base_x402_routes import router as base_x402_router
 from routes.agreement_routes import router as agreement_router
 from routes.auth_routes import router as auth_router
 from routes.benchmark_routes import router as benchmark_router
@@ -48,13 +49,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ManagerX", version="1.0.0", lifespan=lifespan)
 
-# x402 payment gate on the agentic /v1/benchmark service. Added before CORS so
-# CORS stays outermost; Enrich402 sits just outside the payment middleware to
-# splice the usage hint into its 402 body. No-op when keys are absent.
+# x402 payment gates on the agentic services. Two rails on disjoint paths:
+#   - X Layer / USDT0, self-hosted facilitator (OKX #7120)  -> /v1/{benchmark,tailor,cover-letter}
+#   - Base / USDC, CDP facilitator (x402 Bazaar discovery)  -> /v1/base/{...}  [inert w/o CDP key]
+# Each middleware only enforces its own routes; others pass through. Enrich402
+# wraps both to splice the usage hint into any 402 body. Added before CORS so
+# CORS stays outermost.
 if config.X402_ENABLED:
     from x402.http.middleware.fastapi import PaymentMiddlewareASGI
-    from x402_setup import Enrich402Middleware, x402_routes, x402_server
+    from x402_setup import x402_routes, x402_server
     app.add_middleware(PaymentMiddlewareASGI, routes=x402_routes, server=x402_server)
+
+if config.X402_CDP_ENABLED:
+    from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+    from x402_cdp_setup import x402_cdp_routes, x402_cdp_server
+    app.add_middleware(PaymentMiddlewareASGI, routes=x402_cdp_routes, server=x402_cdp_server)
+
+if config.X402_ENABLED or config.X402_CDP_ENABLED:
+    from x402_setup import Enrich402Middleware
     app.add_middleware(Enrich402Middleware)
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
@@ -62,7 +74,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
 
 for r in (auth_router, profile_router, job_router, agreement_router, document_router,
           listing_router, proof_router, public_router, benchmark_router,
-          agentic_router, agent_jobs_router):
+          agentic_router, agent_jobs_router, base_x402_router):
     app.include_router(r)
 
 
@@ -75,7 +87,8 @@ async def health():
             "smtp": config.SMTP_ENABLED,
             "funding": config.FUNDING_ENABLED,
             "github_oauth": config.GITHUB_OAUTH_ENABLED,
-            "x402": config.X402_ENABLED}
+            "x402": config.X402_ENABLED,
+            "x402_cdp": config.X402_CDP_ENABLED}
 
 
 if STATIC_DIR.is_dir():
