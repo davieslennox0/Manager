@@ -42,6 +42,9 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(scanner.scanner_loop()))
     if config.FUNDING_ENABLED:
         tasks.append(asyncio.create_task(funding.funding_loop()))
+    if config.BALANCE_REPORT_ENABLED:
+        import balance_report
+        tasks.append(asyncio.create_task(balance_report.balance_report_loop()))
     yield
     for task in tasks:
         task.cancel()

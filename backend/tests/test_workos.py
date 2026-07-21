@@ -350,3 +350,27 @@ def test_wall_looks_like_agent():
         headers={"user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1)"}))
     assert x._looks_like_agent(_FakeReq(                                              # paying x402 client
         headers={"user-agent": browser, "x-payment": "eyJ..."}))
+
+
+def test_balance_report_format():
+    import balance_report as br
+    data = {"payto": "0xA06ec7302917C4bd51C521330Ec970629b4E047f",
+            "relayer": "0xCf8D", "total_stable": 12.34,
+            "rails": [{"network": "X Layer", "token": "USDT0", "gas_symbol": "OKB",
+                       "token_balance": "12.34", "relayer_gas": "0.5", "low_gas": False}]}
+    msg = br.format_report(data, "2026-07-21")
+    assert "0xA06e…047f" in msg and "X Layer · USDT0: 12.34" in msg
+    assert "≈ 12.34" in msg and "⚠️" not in msg
+    # low gas raises a visible warning; a dead RPC degrades to a read-failed line
+    data["rails"][0]["low_gas"] = True
+    assert "LOW" in br.format_report(data, "2026-07-21")
+    data["rails"][0] = {"network": "Base", "token": "USDC", "gas_symbol": "ETH",
+                        "error": "TimeoutError"}
+    assert "read failed" in br.format_report(data, "2026-07-21")
+
+
+def test_balance_trim():
+    import balance_report as br
+    assert br._fmt(12340000, 6) == "12.34"
+    assert br._fmt(0, 6) == "0"
+    assert br._fmt(1000000, 6) == "1"

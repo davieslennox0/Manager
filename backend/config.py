@@ -54,6 +54,16 @@ BASE_USDC_CONTRACT = os.getenv("BASE_USDC_CONTRACT",
                                "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")  # USDC on Base
 X402_CDP_ENABLED = bool(CDP_API_KEY_ID and CDP_API_KEY_SECRET and BASE_X402_PAY_TO)
 
+# Telegram ops alerts (shared bot/chat with the sibling services). Optional: the
+# daily PayTo balance report is a no-op until both are set.
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+# Weekday end-of-day balance of the x402 PayTo wallet -> Telegram. Fires once per
+# business day at/after this UTC hour. Needs Telegram + x402 (for the payTo addr).
+BALANCE_REPORT_HOUR_UTC = int(os.getenv("BALANCE_REPORT_HOUR_UTC", "21"))
+BALANCE_REPORT_ENABLED = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID and X402_PAY_TO
+                              and os.getenv("BALANCE_REPORT_ENABLED", "1") == "1")
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")

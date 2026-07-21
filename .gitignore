@@ -8,3 +8,4 @@ node_modules/
 contracts/out/
 contracts/cache/
 frontend/dist/
+.balance_report_last
