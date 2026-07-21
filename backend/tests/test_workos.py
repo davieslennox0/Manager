@@ -234,3 +234,85 @@ def test_proof_card_svg(client):
     assert card.status_code == 200
     assert card.headers["content-type"].startswith("image/svg+xml")
     assert "Solidity Auditor" in card.text and "DeFi Labs" in card.text
+
+
+# --- Agent-jobs adapters: normalization is the breakable part; test it offline. ---
+
+class _FakeResp:
+    def __init__(self, payload):
+        self._p = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._p
+
+
+class _FakeClient:
+    def __init__(self, payload):
+        self._p = payload
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get(self, url, params=None):
+        return _FakeResp(self._p)
+
+
+def _patch_http(monkeypatch, payload):
+    import agent_jobs
+    monkeypatch.setattr(agent_jobs.httpx, "AsyncClient",
+                        lambda *a, **k: _FakeClient(payload))
+
+
+def test_agent_jobs_trim():
+    import agent_jobs
+    assert agent_jobs._trim("10.0000") == "10"
+    assert agent_jobs._trim("15.5000") == "15.5"
+    assert agent_jobs._trim(None) == "" and agent_jobs._trim("") == ""
+    assert agent_jobs._trim("N/A") == "N/A"  # non-numeric passes through
+
+
+def test_dealwork_adapter_normalizes(monkeypatch):
+    import asyncio
+    import agent_jobs
+    _patch_http(monkeypatch, {"data": [
+        {"id": "d1", "title": "Base research", "description": "x", "category": "research",
+         "tags": ["defi"], "eligibleWorkerTypes": "ai_only", "budgetMin": "10.0000",
+         "budgetMax": "10.0000", "fixedPrice": None, "status": "bidding",
+         "visibility": "public", "biddingDeadline": "2026-08-01T00:00:00.000Z",
+         "createdAt": "2026-07-21T00:00:00Z", "posterDisplayName": "Bot"},
+        {"id": "d2", "title": "closed", "status": "completed", "visibility": "public"},
+        {"id": "d3", "title": "human only", "status": "bidding", "visibility": "public",
+         "eligibleWorkerTypes": "human_only"},
+    ]})
+    rows = asyncio.run(agent_jobs._dealwork())
+    assert [r["external_id"] for r in rows] == ["d1", "d3"]  # completed dropped
+    d1 = rows[0]
+    assert d1["reward"] == "10" and d1["token"] == "USDC" and d1["chain"] == "Base"
+    assert d1["agent_access"] == "AGENT" and d1["deadline"] == "2026-08-01"
+    assert rows[1]["agent_access"] == "HUMAN_ONLY"
+
+
+def test_x402_bounty_adapter_filters_and_normalizes(monkeypatch):
+    import asyncio
+    import agent_jobs
+    _patch_http(monkeypatch, {"resources": [
+        {"resource": "https://x.io/bounty/claim", "serviceName": "Bounty Board",
+         "tags": ["bounty", "work"], "description": "Claim an open bounty to work on",
+         "accepts": [{"amount": "2000", "network": "base"}], "lastUpdated": "2026-07-21T00:00:00Z"},
+        {"resource": "https://x.io/email", "serviceName": "Email service",
+         "tags": ["email", "smtp"], "description": "Send email over x402",
+         "accepts": [{"amount": "10000", "network": "eip155:8453"}]},
+    ]})
+    rows = asyncio.run(agent_jobs._x402_bounties())
+    assert len(rows) == 1  # the non-bounty service is filtered out
+    r = rows[0]
+    assert r["url"] == "https://x.io/bounty/claim"
+    assert r["chain"] == "Base"  # bare "base" slug normalized
+    assert r["reward"] == "" and "x402 claim 0.002 USDC" in r["description"]
+    assert r["agent_access"] == "AGENT"
