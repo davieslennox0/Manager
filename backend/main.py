@@ -45,6 +45,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ManagerX", version="1.0.0", lifespan=lifespan)
+
+# x402 payment gate on the agentic /v1/benchmark service. Added before CORS so
+# CORS stays outermost; Enrich402 sits just outside the payment middleware to
+# splice the usage hint into its 402 body. No-op when keys are absent.
+if config.X402_ENABLED:
+    from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+    from x402_setup import Enrich402Middleware, x402_routes, x402_server
+    app.add_middleware(PaymentMiddlewareASGI, routes=x402_routes, server=x402_server)
+    app.add_middleware(Enrich402Middleware)
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 
@@ -61,7 +71,8 @@ async def health():
             "scanner": config.SCANNER_ENABLED,
             "smtp": config.SMTP_ENABLED,
             "funding": config.FUNDING_ENABLED,
-            "github_oauth": config.GITHUB_OAUTH_ENABLED}
+            "github_oauth": config.GITHUB_OAUTH_ENABLED,
+            "x402": config.X402_ENABLED}
 
 
 if STATIC_DIR.is_dir():

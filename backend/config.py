@@ -27,6 +27,14 @@ XLAYER_RPC_URL = os.getenv("XLAYER_RPC_URL", "https://rpc.xlayer.tech")
 CHAIN_ID = int(os.getenv("CHAIN_ID", "196"))
 REGISTRY_ADDRESS = os.getenv("SIGNATURE_REGISTRY_ADDRESS", "")
 
+# x402: ManagerX's paid agentic surface (the /v1/benchmark ASP service). Gated on
+# a payTo + operator key being present, so the app boots and the whole product
+# still works without them — payment just isn't required. Same pattern as SMTP.
+X402_PAY_TO = os.getenv("MANAGERX_X402_PAY_TO", "")
+X402_OPERATOR_KEY = os.getenv("OPERATOR_WALLET_PRIVATE_KEY", "")
+X402_USDT_CONTRACT = os.getenv("XLAYER_X402_USDT_CONTRACT_ADDRESS", "")
+X402_ENABLED = bool(X402_PAY_TO and X402_OPERATOR_KEY and X402_USDT_CONTRACT)
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
