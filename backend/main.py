@@ -15,6 +15,7 @@ import config
 import funding
 import scanner
 from db import init_db
+from routes.agent_jobs_routes import router as agent_jobs_router
 from routes.agentic_routes import router as agentic_router
 from routes.agreement_routes import router as agreement_router
 from routes.auth_routes import router as auth_router
@@ -61,7 +62,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
 
 for r in (auth_router, profile_router, job_router, agreement_router, document_router,
           listing_router, proof_router, public_router, benchmark_router,
-          agentic_router):
+          agentic_router, agent_jobs_router):
     app.include_router(r)
 
 

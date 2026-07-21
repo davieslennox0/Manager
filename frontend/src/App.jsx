@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getToken, setToken } from "./lib/api";
 import { Link, navigate, usePath } from "./lib/router";
+import AgentJobs from "./pages/AgentJobs.jsx";
 import Agreements from "./pages/Agreements.jsx";
 import Board from "./pages/Board.jsx";
 import Documents from "./pages/Documents.jsx";
@@ -37,6 +38,7 @@ function Nav() {
         </Link>
         <div className="hidden sm:flex items-center gap-5">
           <Link to="/board" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Job board</Link>
+          <Link to="/agent-jobs" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Agent&nbsp;Jobs</Link>
           <a href="/#features" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Features</a>
           <a href="/#how" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">How it works</a>
         </div>
@@ -74,6 +76,7 @@ export default function App() {
   let page;
   if (path === "/login" || path === "/signup") page = <Login mode={path.slice(1)} />;
   else if (path === "/board") page = <Board />;
+  else if (path === "/agent-jobs") page = <AgentJobs />;
   else if (path === "/jobs") page = <Jobs />;
   else if (path.startsWith("/job/")) page = <JobDetail jobId={path.split("/")[2]} />;
   else if (path === "/documents") page = <Documents />;
@@ -92,6 +95,7 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-4 py-8 flex flex-wrap gap-x-8 gap-y-2 text-xs text-neutral-500">
           <span className="font-medium text-neutral-700 dark:text-neutral-300">ManagerX</span>
           <Link to="/board" className="hover:text-black dark:hover:text-white">Job board</Link>
+          <Link to="/agent-jobs" className="hover:text-black dark:hover:text-white">Agent Jobs</Link>
           <a href="/#features" className="hover:text-black dark:hover:text-white">Features</a>
           <a href="/#how" className="hover:text-black dark:hover:text-white">How it works</a>
           <span className="ml-auto">

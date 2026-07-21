@@ -308,6 +308,7 @@ def seed_sources():
 async def scanner_loop():
     """Background task started by main.py; digests ride the same tick."""
     from mailer import send_deadline_reminders, send_digests, send_job_match_alerts
+    from agent_jobs import refresh_agent_jobs
     while True:
         try:
             result = await scan_due_sources()
@@ -315,6 +316,10 @@ async def scanner_loop():
                 await asyncio.to_thread(send_digests, result["new_listings"])
                 await asyncio.to_thread(send_job_match_alerts, result["new_listings"])
             await asyncio.to_thread(send_deadline_reminders)
+            try:
+                await refresh_agent_jobs()  # agent-jobs board rides the same tick
+            except Exception:
+                pass
         except Exception:
             pass  # a failing tick must never kill the loop; per-source errors are stored
         await asyncio.sleep(config.SCANNER_TICK_SECONDS)

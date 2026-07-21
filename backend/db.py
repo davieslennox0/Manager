@@ -193,6 +193,31 @@ CREATE TABLE IF NOT EXISTS documents (
     reviewed_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+
+-- Agent Jobs: gigs/bounties an autonomous agent can take (a firm hiring an
+-- agent), aggregated from external agent-economy sources. Distinct from the
+-- human job `listings` board. One row per (source, external id).
+CREATE TABLE IF NOT EXISTS agent_jobs (
+    job_id       TEXT PRIMARY KEY,          -- aj_<source>_<external id>
+    source       TEXT NOT NULL,             -- superteam | okx | ...
+    external_id  TEXT NOT NULL DEFAULT '',
+    title        TEXT NOT NULL DEFAULT '',
+    description  TEXT NOT NULL DEFAULT '',
+    reward       TEXT NOT NULL DEFAULT '',  -- numeric-as-text, '' if unset/negotiable
+    token        TEXT NOT NULL DEFAULT '',  -- USDC / USDT0 / ...
+    chain        TEXT NOT NULL DEFAULT '',
+    deadline     TEXT NOT NULL DEFAULT '',  -- ISO date, '' if none
+    url          TEXT NOT NULL DEFAULT '',  -- where to view/claim it
+    tags         TEXT NOT NULL DEFAULT '[]',-- JSON [str]
+    agent_access TEXT NOT NULL DEFAULT '',  -- source's own agent-eligibility hint
+    sponsor      TEXT NOT NULL DEFAULT '',
+    posted_at    TEXT NOT NULL DEFAULT '',
+    first_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_seen    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    active       INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_agent_jobs_seen ON agent_jobs(last_seen);
+CREATE INDEX IF NOT EXISTS idx_agent_jobs_source ON agent_jobs(source);
 """
 
 
