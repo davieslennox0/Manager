@@ -59,6 +59,12 @@ if config.X402_ENABLED:
     from x402.http.middleware.fastapi import PaymentMiddlewareASGI
     from x402_setup import x402_routes, x402_server
     app.add_middleware(PaymentMiddlewareASGI, routes=x402_routes, server=x402_server)
+    # Paywall on the website itself: agents pay 0.1 USDT0 per view, humans free.
+    # Added after the services gate (disjoint paths) and before Enrich402 so its
+    # 402 challenge gets enriched too. Kill-switch: WEBSITE_WALL_ENABLED=0.
+    if config.WEBSITE_WALL_ENABLED:
+        from x402_setup import WebsiteWallMiddleware
+        app.add_middleware(WebsiteWallMiddleware)
 
 if config.X402_CDP_ENABLED:
     from x402.http.middleware.fastapi import PaymentMiddlewareASGI
@@ -88,7 +94,8 @@ async def health():
             "funding": config.FUNDING_ENABLED,
             "github_oauth": config.GITHUB_OAUTH_ENABLED,
             "x402": config.X402_ENABLED,
-            "x402_cdp": config.X402_CDP_ENABLED}
+            "x402_cdp": config.X402_CDP_ENABLED,
+            "website_wall": config.X402_ENABLED and config.WEBSITE_WALL_ENABLED}
 
 
 if STATIC_DIR.is_dir():

@@ -316,3 +316,37 @@ def test_x402_bounty_adapter_filters_and_normalizes(monkeypatch):
     assert r["chain"] == "Base"  # bare "base" slug normalized
     assert r["reward"] == "" and "x402 claim 0.002 USDC" in r["description"]
     assert r["agent_access"] == "AGENT"
+
+
+# --- Website paywall: humans free, agents pay. The gate decision is the risk. ---
+
+class _FakeReq:
+    def __init__(self, path="/", method="GET", headers=None):
+        self.method = method
+        self.headers = headers or {}
+        self.url = type("U", (), {"path": path})()
+
+
+def test_wall_is_page_request():
+    import x402_setup as x
+    assert x._is_page_request(_FakeReq("/"))            # homepage
+    assert x._is_page_request(_FakeReq("/profiles"))    # SPA route
+    assert not x._is_page_request(_FakeReq("/v1/agent-jobs"))
+    assert not x._is_page_request(_FakeReq("/assets/app.js"))
+    assert not x._is_page_request(_FakeReq("/health"))
+    assert not x._is_page_request(_FakeReq("/favicon.ico"))
+    assert not x._is_page_request(_FakeReq("/managerx-mark.svg"))  # static asset
+    assert not x._is_page_request(_FakeReq("/", method="POST"))    # non-GET
+
+
+def test_wall_looks_like_agent():
+    import x402_setup as x
+    browser = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120"
+    assert not x._looks_like_agent(_FakeReq(headers={"user-agent": browser}))       # human
+    assert x._looks_like_agent(_FakeReq(headers={"user-agent": "python-httpx/0.27"}))  # agent
+    assert x._looks_like_agent(_FakeReq(headers={"user-agent": "curl/8.0"}))         # agent
+    assert x._looks_like_agent(_FakeReq(headers={}))                                 # no UA -> agent
+    assert not x._looks_like_agent(_FakeReq(                                          # crawler -> free
+        headers={"user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1)"}))
+    assert x._looks_like_agent(_FakeReq(                                              # paying x402 client
+        headers={"user-agent": browser, "x-payment": "eyJ..."}))

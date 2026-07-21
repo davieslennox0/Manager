@@ -16,6 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
 from x402 import x402ResourceServer
 from x402.mechanisms.evm.exact.server import ExactEvmScheme
+from x402.http.middleware.fastapi import payment_middleware
 from x402.http.types import PaymentOption, RouteConfig
 from x402.schemas import AssetAmount
 
@@ -141,6 +142,90 @@ _USAGE = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Website paywall: agents pay per view, humans (and crawlers) browse free.
+# ---------------------------------------------------------------------------
+# 0.1 USDT0 per page view, priced per REQUEST with no session — so a return visit
+# tomorrow pays again. Reuses the X Layer/USDT0 facilitator above. A single
+# "GET /*" route gates every page; _is_page_request narrows what actually reaches
+# the gate (never /assets, /v1, /health, static files), and _looks_like_agent
+# ensures only programmatic clients pay — human browsers pass straight through, so
+# the human product and SEO are untouched. Best-effort by design: an agent that
+# spoofs a full browser UA slips through free (the accepted tradeoff for not
+# breaking real browsers).
+PAGE_FEE_ATOMIC = os.getenv("X402_PAGE_FEE_ATOMIC", "100000")  # 0.1 USDT0 per view
+
+PAGE_ROUTES = {
+    "GET /*": RouteConfig(
+        accepts=_option(PAGE_FEE_ATOMIC),
+        description="ManagerX website access — 0.1 USDT0 per page view (X Layer / "
+                    "USDT0, EIP-3009). Priced per request with no session, so every "
+                    "view including a return visit pays again. Human browsers are "
+                    "served free; automated/agent clients pay per view.",
+    ),
+}
+
+_PAGE_USAGE = {
+    "method": "GET",
+    "note": "Website page view. Priced per request — no session, so a repeat visit "
+            "pays again. Human browsers and search/social crawlers are served free; "
+            "this charge applies to automated/agent clients.",
+    "billing": "0.1 USDT0 per view (X Layer / USDT0, EIP-3009 exact scheme)",
+}
+
+# Search + social crawlers stay free: gating them would drop ManagerX from indexes
+# and break link previews — the whole reason we chose agents-pay over a hard wall.
+_CRAWLER_UA = ("googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider",
+               "yandexbot", "applebot", "petalbot", "facebookexternalhit",
+               "twitterbot", "linkedinbot", "telegrambot", "discordbot", "slackbot")
+
+
+def _is_page_request(request) -> bool:
+    """True only for human-facing HTML page routes — never the API, health, static
+    assets, or well-known files (those must stay free for the site to function)."""
+    if request.method != "GET":
+        return False
+    p = request.url.path
+    if p.startswith(("/v1", "/assets", "/health", "/api", "/.well-known")):
+        return False
+    if p in ("/favicon.ico", "/robots.txt", "/sitemap.xml"):
+        return False
+    last = p.rsplit("/", 1)[-1]
+    if "." in last and not last.endswith(".html"):
+        return False  # a static asset (.js/.css/.png/.svg …), not a page
+    return True
+
+
+def _looks_like_agent(request) -> bool:
+    """Best-effort human-vs-agent split. Bias is toward FREE: a false 'agent' would
+    break the site for a real visitor, so we only gate clients that clearly aren't
+    browsers. Real browsers always send a 'Mozilla/…' UA token."""
+    if request.headers.get("x-payment") or request.headers.get("payment-signature"):
+        return True  # a paying x402 client — gate so its payment settles
+    ua = request.headers.get("user-agent", "").lower()
+    if not ua:
+        return True  # no UA is a script/agent, never a normal browser
+    if any(c in ua for c in _CRAWLER_UA):
+        return False  # crawlers/unfurlers free (SEO + link previews)
+    return "mozilla" not in ua
+
+
+class WebsiteWallMiddleware(BaseHTTPMiddleware):
+    """x402 paywall on the human site, engaged only for agent/programmatic clients;
+    humans and crawlers pass through untouched. Delegates matched requests to the
+    SDK's payment middleware (same verify/settle path as the /v1 services), so the
+    402 challenge, EIP-3009 verify, and on-chain settle are all reused."""
+
+    def __init__(self, app):
+        super().__init__(app)
+        self._pay = payment_middleware(PAGE_ROUTES, x402_server)
+
+    async def dispatch(self, request, call_next):
+        if _is_page_request(request) and _looks_like_agent(request):
+            return await self._pay(request, call_next)
+        return await call_next(request)
+
+
 class Enrich402Middleware(BaseHTTPMiddleware):
     """The SDK's 402 puts the challenge only in the base64 PAYMENT-REQUIRED header
     and sends a literal {} body; agents (and marketplace reviewers) who look at the
@@ -157,7 +242,7 @@ class Enrich402Middleware(BaseHTTPMiddleware):
         except (ValueError, TypeError):
             return response
         body = dict(challenge)
-        usage = _USAGE.get(request.url.path)
+        usage = _USAGE.get(request.url.path) or (_PAGE_USAGE if _is_page_request(request) else None)
         if usage:
             body["usage"] = usage
         headers = {k: v for k, v in response.headers.items()

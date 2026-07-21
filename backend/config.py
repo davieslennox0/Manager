@@ -35,6 +35,12 @@ X402_OPERATOR_KEY = os.getenv("OPERATOR_WALLET_PRIVATE_KEY", "")
 X402_USDT_CONTRACT = os.getenv("XLAYER_X402_USDT_CONTRACT_ADDRESS", "")
 X402_ENABLED = bool(X402_PAY_TO and X402_OPERATOR_KEY and X402_USDT_CONTRACT)
 
+# Paywall the website itself: agent/programmatic clients pay 0.1 USDT0 per page
+# view (per request, no session — a return visit pays again); human browsers and
+# crawlers pass through free. On by default when x402 is on; set 0 to lift it.
+WEBSITE_WALL_ENABLED = os.getenv("WEBSITE_WALL_ENABLED", "1") == "1"
+PAGE_FEE_ATOMIC = os.getenv("X402_PAGE_FEE_ATOMIC", "100000")  # 0.1 USDT0
+
 # Second x402 rail: Base/USDC settled through Coinbase's CDP Facilitator. This is
 # the ONLY way into the x402 Bazaar discovery index (Bazaar can't see our
 # self-hosted X Layer/USDT0 rail). Inert until the CDP API key lands — the X Layer
