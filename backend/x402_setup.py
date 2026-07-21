@@ -25,6 +25,7 @@ XLAYER_RPC = os.getenv("XLAYER_RPC_URL", "https://rpc.xlayer.tech")
 PAY_TO = os.environ["MANAGERX_X402_PAY_TO"]
 ASSET = os.environ["XLAYER_X402_USDT_CONTRACT_ADDRESS"]
 BENCHMARK_FEE_ATOMIC = os.getenv("X402_BENCHMARK_FEE_ATOMIC", "20000")  # 0.02 USDT0
+SERVICE_FEE_ATOMIC = os.getenv("X402_SERVICE_FEE_ATOMIC", "100000")  # 0.1 USDT0 per service
 
 _signer = EvmFacilitatorSigner(XLAYER_RPC, os.environ["OPERATOR_WALLET_PRIVATE_KEY"])
 
@@ -57,6 +58,21 @@ x402_routes = {
                     "required_skills) — returns an ATS-readiness + role-fit score "
                     "with skill-coverage gaps and prioritized positioning fixes",
     ),
+    "/v1/tailor": RouteConfig(
+        accepts=_option(SERVICE_FEE_ATOMIC),
+        description="Tailor a CV to one job posting: POST {\"profile\": {...}, "
+                    "\"posting_text\": \"...\"} — mirrors the posting's vocabulary, "
+                    "reorders to the required skills, drops irrelevant experience; "
+                    "returns the tailored CV as structured JSON (never invents "
+                    "skills/experience not in the profile)",
+    ),
+    "/v1/cover-letter": RouteConfig(
+        accepts=_option(SERVICE_FEE_ATOMIC),
+        description="Draft the application email for one posting: POST {\"profile\": "
+                    "{...}, \"posting_text\": \"...\", \"cv\": {...optional}} — 120-180 "
+                    "word cover letter mirroring the posting's tone; returns "
+                    "{subject, body} plus the tailored CV it cites",
+    ),
 }
 
 # What a 402 should tell an agent so it can retry correctly. Merged into the SDK's
@@ -76,6 +92,30 @@ _USAGE = {
         "returns": "overall_score (0-100), verdict, role_fit (covered/missing skills), "
                    "ats (structural checks + issues), seniority_alignment, positioning[]",
         "billing": "0.02 USDT0 per call (X Layer / USDT0, EIP-3009 exact scheme)",
+    },
+    "/v1/tailor": {
+        "method": "POST",
+        "content_type": "application/json",
+        "body": {
+            "profile": "candidate profile object: full_name, headline, summary, "
+                       "skills[], experience[], education[] (source of truth — not invented)",
+            "posting_text": "the job posting as plain text (parsed for you); OR",
+            "posting": "a pre-parsed posting object to skip the parse",
+        },
+        "returns": "{parsed (posting signals), cv (tailored CV JSON: headline, "
+                   "summary, skills[], experience[], education[])}",
+        "billing": "0.1 USDT0 per call (X Layer / USDT0, EIP-3009 exact scheme)",
+    },
+    "/v1/cover-letter": {
+        "method": "POST",
+        "content_type": "application/json",
+        "body": {
+            "profile": "candidate profile object (as in /v1/tailor)",
+            "posting_text": "the job posting as plain text; OR posting (pre-parsed)",
+            "cv": "optional tailored CV to cite; generated on the fly if omitted",
+        },
+        "returns": "{subject, body (120-180 word application email), cv}",
+        "billing": "0.1 USDT0 per call (X Layer / USDT0, EIP-3009 exact scheme)",
     },
 }
 
