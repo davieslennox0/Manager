@@ -232,6 +232,35 @@ async def email_apply(job_id: str, body: ApplyBody, user: dict = Depends(current
             "status": "applied", "reply_to": user["email"]}
 
 
+@router.post("/{job_id}/benchmark")
+async def benchmark_job(job_id: str, user: dict = Depends(current_user)):
+    """Score this job's tailored CV (or the raw profile if none yet) against the
+    stored posting: ATS-readiness + role-fit, with prioritized fixes. Same engine
+    the public /v1/benchmark ASP service runs — here it feeds the 'now generate
+    the fixed CV' loop."""
+    import benchmark
+    conn = get_conn()
+    row = _job(conn, job_id, user["user_id"])
+    cv = conn.execute("SELECT content FROM cvs WHERE job_id = ?", (job_id,)).fetchone()
+    conn.close()
+    parsed = j(row["parsed"], {})
+    if cv:
+        resume_text = benchmark.spine_to_text(j(cv["content"], {}))
+        scored = "tailored_cv"
+    else:
+        resume_text = benchmark.spine_to_text(pipeline.load_spine(user["user_id"]))
+        scored = "profile"
+    if len(resume_text.strip()) < 40:
+        raise HTTPException(422, "Fill in your profile (or generate the CV) first — "
+                                 "there's nothing to benchmark yet")
+    try:
+        result = await benchmark.benchmark_resume(resume_text, parsed)
+    except LLMError as e:
+        raise HTTPException(503, f"Benchmark unavailable: {e}")
+    result["scored"] = scored
+    return {"job_id": job_id, **result}
+
+
 @router.post("/{job_id}/accept")
 async def mark_accepted(job_id: str, user: dict = Depends(current_user)):
     """The offer/gig came through — unlock the work-agreement stage."""

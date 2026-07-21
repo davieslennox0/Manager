@@ -17,6 +17,7 @@ import scanner
 from db import init_db
 from routes.agreement_routes import router as agreement_router
 from routes.auth_routes import router as auth_router
+from routes.benchmark_routes import router as benchmark_router
 from routes.document_routes import router as document_router
 from routes.job_routes import router as job_router
 from routes.listing_routes import router as listing_router
@@ -48,7 +49,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 
 for r in (auth_router, profile_router, job_router, agreement_router, document_router,
-          listing_router, proof_router, public_router):
+          listing_router, proof_router, public_router, benchmark_router):
     app.include_router(r)
 
 
