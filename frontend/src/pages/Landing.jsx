@@ -36,7 +36,7 @@ const FEATURES = [
   {
     tag: "agree",
     title: "Work agreements both sides sign onchain",
-    body: "An accepted offer becomes a work agreement drafted from the same profile spine. Both parties sign it through SignatureRegistry from their own wallets, with a privacy mode that keeps the terms off the public record. Executed agreements become verified work-history entries.",
+    body: "An accepted offer becomes a work agreement drafted from the same profile spine, then created onchain in SignatureRegistry with its signer set fixed and a privacy mode that keeps the terms off the public record. Each listed signer signs from their own wallet; when the last one does, the agreement executes and becomes a verified work-history entry.",
   },
   {
     tag: "prove",
