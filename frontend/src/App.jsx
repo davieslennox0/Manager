@@ -32,19 +32,26 @@ function Nav() {
   const authed = !!getToken();
   return (
     <nav className="sticky top-0 z-20 bg-white/90 dark:bg-wos-dbg/90 backdrop-blur border-b border-wos-border dark:border-wos-dborder">
-      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-6">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-5">
         <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight text-lg">
           <img src="/managerx-logo.png" alt="" aria-hidden="true" className="h-6 w-auto" />
           <span>Manager<span className="text-neutral-500">X</span></span>
         </Link>
-        <div className="hidden sm:flex items-center gap-5">
+        {/* Real routes: always available. Marketing anchors: signed-out only, so a
+            logged-in bar doesn't carry 11 links. */}
+        <div className="hidden sm:flex items-center gap-4">
           <Link to="/board" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Job board</Link>
           <Link to="/agent-jobs" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Agent&nbsp;Jobs</Link>
-          <a href="/#features" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Features</a>
-          <a href="/#review" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Contract review</a>
-          <a href="/#agents" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">For agents</a>
-          <a href="/#how" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">How it works</a>
         </div>
+        {!authed && (
+          <div className="hidden lg:flex items-center gap-4">
+            <a href="/#features" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Features</a>
+            <a href="/#review" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Contract review</a>
+            <a href="/#agents" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">For agents</a>
+            <a href="/#household" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Household&nbsp;Gigs</a>
+            <a href="/#how" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">How it works</a>
+          </div>
+        )}
         {authed && (
           <div className="flex items-center gap-5">
             <Link to="/jobs" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">My applications</Link>
@@ -92,16 +99,17 @@ export default function App() {
     <div className="min-h-screen flex flex-col">
       <Nav />
       {landing ? <main className="flex-1">{page}</main> : (
-        <main className="flex-1 max-w-5xl mx-auto px-4 py-8 w-full">{page}</main>
+        <main className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full">{page}</main>
       )}
       <footer className="border-t border-wos-border dark:border-wos-dborder">
-        <div className="max-w-5xl mx-auto px-4 py-8 flex flex-wrap gap-x-8 gap-y-2 text-xs text-neutral-500">
+        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-wrap gap-x-8 gap-y-2 text-xs text-neutral-500">
           <span className="font-medium text-neutral-700 dark:text-neutral-300">ManagerX</span>
           <Link to="/board" className="hover:text-black dark:hover:text-white">Job board</Link>
           <Link to="/agent-jobs" className="hover:text-black dark:hover:text-white">Agent Jobs</Link>
           <a href="/#features" className="hover:text-black dark:hover:text-white">Features</a>
           <a href="/#review" className="hover:text-black dark:hover:text-white">Contract review</a>
           <a href="/#agents" className="hover:text-black dark:hover:text-white">For agents</a>
+          <a href="/#household" className="hover:text-black dark:hover:text-white">Household Gigs</a>
           <a href="/#how" className="hover:text-black dark:hover:text-white">How it works</a>
           <span className="ml-auto">
             Documents anchor onchain via SignatureRegistry · X Layer (196)

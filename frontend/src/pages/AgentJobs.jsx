@@ -24,7 +24,7 @@ export default function AgentJobs() {
   useEffect(() => { load(); }, [source, agentOnly]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
+    <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agent Jobs</h1>
