@@ -6,8 +6,10 @@ SDK's PaymentMiddlewareASGI ahead of FastAPI routing. Only imported when
 config.X402_ENABLED (payTo + operator key present), so the app boots without keys and
 the whole product still works — payment just isn't required.
 
-The one paid route is /v1/benchmark: the ATS-readiness + role-fit scoring service
-ManagerX lists on the OKX.AI marketplace under Resume & Career Workflows."""
+Paid surfaces: /v1/{benchmark,tailor,cover-letter} (the services ManagerX lists on
+the OKX.AI marketplace under Resume & Career Workflows) plus the website itself.
+Each answers its 402 with one accepts entry per stablecoin in ACCEPTED, so a payer
+settles in whichever of them it already holds."""
 import base64
 import json
 import os
@@ -25,8 +27,8 @@ from x402_seller import NETWORK, EvmFacilitatorSigner, LocalFacilitatorClient
 XLAYER_RPC = os.getenv("XLAYER_RPC_URL", "https://rpc.xlayer.tech")
 PAY_TO = os.environ["MANAGERX_X402_PAY_TO"]
 ASSET = os.environ["XLAYER_X402_USDT_CONTRACT_ADDRESS"]
-BENCHMARK_FEE_ATOMIC = os.getenv("X402_BENCHMARK_FEE_ATOMIC", "20000")  # 0.02 USDT0
-SERVICE_FEE_ATOMIC = os.getenv("X402_SERVICE_FEE_ATOMIC", "100000")  # 0.1 USDT0 per service
+BENCHMARK_FEE_ATOMIC = os.getenv("X402_BENCHMARK_FEE_ATOMIC", "20000")  # 0.02
+SERVICE_FEE_ATOMIC = os.getenv("X402_SERVICE_FEE_ATOMIC", "100000")  # 0.1 per service
 
 _signer = EvmFacilitatorSigner(XLAYER_RPC, os.environ["OPERATOR_WALLET_PRIVATE_KEY"])
 
@@ -34,21 +36,95 @@ x402_server = x402ResourceServer(LocalFacilitatorClient(_signer))
 x402_server.register(NETWORK, ExactEvmScheme())
 x402_server.initialize()
 
-# EIP-3009 transferWithAuthorization: no buyer Permit2 approve needed.
-# name/version must match the token's EIP-712 domain (verified on-chain).
-_USDT0_EXTRA = {"assetTransferMethod": "eip3009", "name": "USD₮0", "version": "1",
-                "decimals": 6}
+# Every stablecoin we accept, all on X Layer and all EIP-3009 + 6 decimals — so one
+# atomic amount prices all of them and a single-network facilitator settles all of
+# them (no router, no extra gas, no second chain). Addresses come from OKX's
+# official xlayer-tokenlist. DAI is deliberately absent: it has no
+# transferWithAuthorization, so the exact scheme cannot use it.
+#
+# `name`/`version` ARE the token's EIP-712 domain, and getting one wrong does not
+# fail loudly — it silently rejects every signature the payer sends. _verify_domains
+# reconstructs each DOMAIN_SEPARATOR on-chain at boot so a bad entry is caught here
+# rather than as a stream of mystery payment failures.
+ASSETS = [
+    {"symbol": "USDT0", "address": ASSET, "name": "USD₮0", "version": "1"},
+    {"symbol": "USDC", "address": os.getenv("XLAYER_USDC_CONTRACT_ADDRESS",
+                                            "0x74b7F16337b8972027F6196A17a631aC6dE26d22"),
+     "name": "USD Coin", "version": "2"},
+    {"symbol": "USDG", "address": os.getenv("XLAYER_USDG_CONTRACT_ADDRESS",
+                                            "0x4ae46a509F6b1D9056937BA4500cb143933D2dc8"),
+     "name": "Global Dollar", "version": "1"},
+]
+DECIMALS = 6
+
+_DOMAIN_TYPEHASH_TEXT = ("EIP712Domain(string name,string version,uint256 chainId,"
+                         "address verifyingContract)")
 
 
-def _option(amount_atomic: str) -> PaymentOption:
-    return PaymentOption(
-        scheme="exact",
-        pay_to=PAY_TO,
-        price=AssetAmount(amount=amount_atomic, asset=ASSET),
-        network=NETWORK,
-        max_timeout_seconds=120,
-        extra=_USDT0_EXTRA,
-    )
+def _verify_domains(assets: list[dict]) -> list[dict]:
+    """Drop any asset whose configured EIP-712 domain doesn't match the chain.
+
+    A mismatch is dropped (it could never take a payment anyway), but an
+    unreachable RPC keeps the asset — we can't prove it wrong, and losing every
+    payment option because a node blipped at boot is the worse failure."""
+    from eth_abi import encode
+    from web3 import Web3
+
+    try:
+        w3 = Web3(Web3.HTTPProvider(XLAYER_RPC, request_kwargs={"timeout": 15}))
+        chain_id = w3.eth.chain_id
+        typehash = Web3.keccak(text=_DOMAIN_TYPEHASH_TEXT)
+        abi = [{"name": "DOMAIN_SEPARATOR", "inputs": [],
+                "outputs": [{"type": "bytes32"}], "type": "function",
+                "stateMutability": "view"}]
+    except Exception as e:  # RPC unreachable — trust config, don't strip rails
+        print(f"[x402] domain check skipped ({type(e).__name__}); accepting all assets")
+        return assets
+
+    ok = []
+    for a in assets:
+        try:
+            addr = Web3.to_checksum_address(a["address"])
+            onchain = w3.eth.contract(address=addr, abi=abi).functions.DOMAIN_SEPARATOR().call()
+            expected = Web3.keccak(encode(
+                ["bytes32", "bytes32", "bytes32", "uint256", "address"],
+                [typehash, Web3.keccak(text=a["name"]),
+                 Web3.keccak(text=a["version"]), chain_id, addr]))
+            if onchain == expected:
+                ok.append(a)
+            else:
+                print(f"[x402] DROPPED {a['symbol']} — EIP-712 domain mismatch "
+                      f"(name={a['name']!r} version={a['version']!r}); it would "
+                      f"reject every payment")
+        except Exception as e:
+            print(f"[x402] {a['symbol']} domain unverified ({type(e).__name__}); keeping")
+            ok.append(a)
+    return ok
+
+
+ACCEPTED = _verify_domains(ASSETS)
+
+
+def _option(amount_atomic: str) -> list[PaymentOption]:
+    """One PaymentOption per accepted asset — the payer picks whichever it holds."""
+    return [
+        PaymentOption(
+            scheme="exact",
+            pay_to=PAY_TO,
+            price=AssetAmount(amount=amount_atomic, asset=a["address"]),
+            network=NETWORK,
+            max_timeout_seconds=120,
+            # EIP-3009 transferWithAuthorization: no buyer Permit2 approve needed.
+            extra={"assetTransferMethod": "eip3009", "name": a["name"],
+                   "version": a["version"], "decimals": DECIMALS},
+        )
+        for a in ACCEPTED
+    ]
+
+
+def _rails(unit: str) -> str:
+    """'0.1 USDT0 / USDC / USDG' — the billing line for the usage docs."""
+    return f"{unit} " + " / ".join(a["symbol"] for a in ACCEPTED)
 
 
 x402_routes = {
@@ -92,7 +168,7 @@ _USAGE = {
         },
         "returns": "overall_score (0-100), verdict, role_fit (covered/missing skills), "
                    "ats (structural checks + issues), seniority_alignment, positioning[]",
-        "billing": "0.02 USDT0 per call (X Layer / USDT0, EIP-3009 exact scheme)",
+        "billing": f"{_rails('0.02')} per call (X Layer, EIP-3009 exact scheme)",
     },
     "/v1/tailor": {
         "method": "POST",
@@ -105,7 +181,7 @@ _USAGE = {
         },
         "returns": "{parsed (posting signals), cv (tailored CV JSON: headline, "
                    "summary, skills[], experience[], education[])}",
-        "billing": "0.1 USDT0 per call (X Layer / USDT0, EIP-3009 exact scheme)",
+        "billing": f"{_rails('0.1')} per call (X Layer, EIP-3009 exact scheme)",
     },
     "/v1/cover-letter": {
         "method": "POST",
@@ -116,7 +192,7 @@ _USAGE = {
             "cv": "optional tailored CV to cite; generated on the fly if omitted",
         },
         "returns": "{subject, body (120-180 word application email), cv}",
-        "billing": "0.1 USDT0 per call (X Layer / USDT0, EIP-3009 exact scheme)",
+        "billing": f"{_rails('0.1')} per call (X Layer, EIP-3009 exact scheme)",
     },
     # Base/USDC rail (CDP facilitator, x402 Bazaar) — same services, USDC on Base.
     "/v1/base/benchmark": {
@@ -158,10 +234,10 @@ PAGE_FEE_ATOMIC = os.getenv("X402_PAGE_FEE_ATOMIC", "100000")  # 0.1 USDT0 per v
 PAGE_ROUTES = {
     "GET /*": RouteConfig(
         accepts=_option(PAGE_FEE_ATOMIC),
-        description="ManagerX website access — 0.1 USDT0 per page view (X Layer / "
-                    "USDT0, EIP-3009). Priced per request with no session, so every "
-                    "view including a return visit pays again. Human browsers are "
-                    "served free; automated/agent clients pay per view.",
+        description=f"ManagerX website access — {_rails('0.1')} per page view "
+                    f"(X Layer, EIP-3009). Priced per request with no session, so "
+                    f"every view including a return visit pays again. Human browsers "
+                    f"are served free; automated/agent clients pay per view.",
     ),
 }
 
@@ -170,7 +246,7 @@ _PAGE_USAGE = {
     "note": "Website page view. Priced per request — no session, so a repeat visit "
             "pays again. Human browsers and search/social crawlers are served free; "
             "this charge applies to automated/agent clients.",
-    "billing": "0.1 USDT0 per view (X Layer / USDT0, EIP-3009 exact scheme)",
+    "billing": f"{_rails('0.1')} per view (X Layer, EIP-3009 exact scheme)",
 }
 
 # Search + social crawlers stay free: gating them would drop ManagerX from indexes

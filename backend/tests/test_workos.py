@@ -374,3 +374,37 @@ def test_balance_trim():
     assert br._fmt(12340000, 6) == "12.34"
     assert br._fmt(0, 6) == "0"
     assert br._fmt(1000000, 6) == "1"
+
+def test_x402_accepts_one_option_per_asset():
+    """Every gated route offers each accepted stablecoin, so a payer settles in
+    whichever it holds. All are 6-decimal, so one atomic amount prices them all."""
+    x = pytest.importorskip("x402_setup")
+    opts = x._option("100000")
+    assert len(opts) == len(x.ACCEPTED) >= 1
+    assert {o.price.asset.lower() for o in opts} == {
+        a["address"].lower() for a in x.ACCEPTED}
+    for o in opts:
+        assert o.scheme == "exact"
+        assert o.network == x.NETWORK          # one network -> no router needed
+        assert o.price.amount == "100000"      # shared amount: all 6 decimals
+        assert o.extra["assetTransferMethod"] == "eip3009"
+        assert o.extra["decimals"] == 6
+    # distinct EIP-712 domains per token (USDC is version 2, the others version 1)
+    assert len({(o.extra["name"], o.extra["version"]) for o in opts}) == len(opts)
+
+
+def test_x402_domain_verification_drops_mismatch(monkeypatch):
+    """A wrong EIP-712 domain silently rejects every payment, so it must be caught
+    at boot rather than shipped. A correct entry alongside it is kept."""
+    x = pytest.importorskip("x402_setup")
+    usdc = next(a for a in x.ASSETS if a["symbol"] == "USDC")
+    kept = x._verify_domains([{**usdc, "version": "999"}, dict(usdc)])
+    assert [a["version"] for a in kept] == [usdc["version"]]
+
+
+def test_x402_rails_line_lists_every_symbol():
+    x = pytest.importorskip("x402_setup")
+    line = x._rails("0.02")
+    assert line.startswith("0.02 ")
+    for a in x.ACCEPTED:
+        assert a["symbol"] in line

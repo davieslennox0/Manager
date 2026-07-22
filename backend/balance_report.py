@@ -25,16 +25,24 @@ _RELAYER = (Account.from_key(config.X402_OPERATOR_KEY).address
             if config.X402_OPERATOR_KEY else "")
 LOW_GAS = float(os.getenv("RELAYER_LOW_GAS", "0.01"))  # warn below this much native gas
 
-# One entry per accepted settlement rail. Only X Layer/USDT0 is live today; append
-# here when a new rail (its RPC + token) goes live so it joins the daily total.
-RAILS = [{
-    "network": "X Layer",
-    "token": "USDT0",
-    "rpc": config.XLAYER_RPC_URL,
-    "contract": config.X402_USDT_CONTRACT,
-    "decimals": 6,
-    "gas_symbol": "OKB",
-}]
+def _rails() -> list[dict]:
+    """One entry per accepted settlement rail.
+
+    Derived from x402_setup.ACCEPTED so the report can never drift from what the
+    402 actually offers — adding a stablecoin there makes it show up here with no
+    second edit. Falls back to USDT0 alone when x402 is off (or its env is
+    missing), which is also the only rail that existed before multi-asset."""
+    base = {"network": "X Layer", "rpc": config.XLAYER_RPC_URL,
+            "decimals": 6, "gas_symbol": "OKB"}
+    try:
+        import x402_setup
+        return [{**base, "token": a["symbol"], "contract": a["address"]}
+                for a in x402_setup.ACCEPTED]
+    except Exception:
+        return [{**base, "token": "USDT0", "contract": config.X402_USDT_CONTRACT}]
+
+
+RAILS = _rails()
 
 _ERC20_ABI = [{
     "constant": True, "name": "balanceOf", "type": "function",
@@ -57,17 +65,25 @@ def read_payto_balances() -> dict:
     payto = config.X402_PAY_TO
     rails = []
     total_stable = 0.0
+    conns: dict[str, Web3] = {}
+    gassed: set[str] = set()
     for r in RAILS:
         row = {"network": r["network"], "token": r["token"], "gas_symbol": r["gas_symbol"]}
         try:
-            w3 = Web3(Web3.HTTPProvider(r["rpc"], request_kwargs={"timeout": 20}))
+            # Several tokens share one network: reuse the connection, and read gas
+            # once per network so the report doesn't repeat the same figure.
+            w3 = conns.get(r["rpc"])
+            if w3 is None:
+                w3 = conns[r["rpc"]] = Web3(
+                    Web3.HTTPProvider(r["rpc"], request_kwargs={"timeout": 20}))
             addr = Web3.to_checksum_address(payto)
             token = w3.eth.contract(address=Web3.to_checksum_address(r["contract"]),
                                     abi=_ERC20_ABI)
             bal = token.functions.balanceOf(addr).call()
             row["token_balance"] = _fmt(bal, r["decimals"])
             total_stable += bal / (10 ** r["decimals"])
-            if _RELAYER:  # gas lives on the relayer, not payTo
+            if _RELAYER and r["network"] not in gassed:  # gas is on the relayer, not payTo
+                gassed.add(r["network"])
                 gas_wei = w3.eth.get_balance(Web3.to_checksum_address(_RELAYER))
                 row["relayer_gas"] = _fmt(gas_wei, 18)
                 row["low_gas"] = gas_wei / 1e18 < LOW_GAS
