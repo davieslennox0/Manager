@@ -33,8 +33,9 @@ function Nav() {
   return (
     <nav className="sticky top-0 z-20 bg-white/90 dark:bg-wos-dbg/90 backdrop-blur border-b border-wos-border dark:border-wos-dborder">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-6">
-        <Link to="/" className="font-semibold tracking-tight text-lg">
-          Manager<span className="text-neutral-500">X</span>
+        <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight text-lg">
+          <img src="/managerx-logo.png" alt="" aria-hidden="true" className="h-6 w-auto" />
+          <span>Manager<span className="text-neutral-500">X</span></span>
         </Link>
         <div className="hidden sm:flex items-center gap-5">
           <Link to="/board" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Job board</Link>
