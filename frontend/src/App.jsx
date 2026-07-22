@@ -41,6 +41,7 @@ function Nav() {
           <Link to="/board" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Job board</Link>
           <Link to="/agent-jobs" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Agent&nbsp;Jobs</Link>
           <a href="/#features" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Features</a>
+          <a href="/#agents" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">For agents</a>
           <a href="/#how" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">How it works</a>
         </div>
         {authed && (
@@ -98,6 +99,7 @@ export default function App() {
           <Link to="/board" className="hover:text-black dark:hover:text-white">Job board</Link>
           <Link to="/agent-jobs" className="hover:text-black dark:hover:text-white">Agent Jobs</Link>
           <a href="/#features" className="hover:text-black dark:hover:text-white">Features</a>
+          <a href="/#agents" className="hover:text-black dark:hover:text-white">For agents</a>
           <a href="/#how" className="hover:text-black dark:hover:text-white">How it works</a>
           <span className="ml-auto">
             Documents anchor onchain via SignatureRegistry · X Layer (196)

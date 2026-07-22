@@ -9,9 +9,24 @@ const FEATURES = [
     body: "Career pages and Web3 job feeds are polled continuously — Greenhouse, Lever, crypto-native aggregators — normalized, deduplicated, and categorized. Filter by ecosystem, category, or firm; or get digest emails matched to your filters.",
   },
   {
+    tag: "funded",
+    title: "Firms that just raised, before they post",
+    body: "Funding-round coverage is watched alongside the job feeds. Firms with open roles get flagged newly funded on the board; firms that raised but haven't posted yet sit in a separate tier — recently funded, likely hiring soon — so you can reach out ahead of the listing.",
+  },
+  {
+    tag: "benchmark",
+    title: "Know the fit before you spend the effort",
+    body: "Score any résumé against a specific posting: ATS-readiness, skill-coverage gaps, parse problems that would break a machine reader, and a prioritized list of positioning fixes. A fast, reproducible signal on whether the role is worth an application.",
+  },
+  {
     tag: "apply",
     title: "One CV per job, not one CV for all jobs",
-    body: "Pick a posting and ManagerX generates a CV tailored to exactly it: your skills reordered to mirror the listing's own language, irrelevant experience dropped. Nothing invented — it only draws from your profile. Review, edit, export as PDF.",
+    body: "Pick a posting and ManagerX generates a CV tailored to exactly it: your skills reordered to mirror the listing's own language, irrelevant experience dropped. Nothing invented — it only draws from your profile. A matching cover letter is drafted from the same spine. Review, edit, export as PDF.",
+  },
+  {
+    tag: "evidence",
+    title: "Claims backed by what you actually shipped",
+    body: "Connect GitHub — by OAuth, or in public-data mode with just a username — and a wallet you prove by signature. ManagerX matches that evidence to each posting's requirements and merges it into that job's CV, so a claim points at a repo or an onchain footprint instead of standing alone.",
   },
   {
     tag: "review",
@@ -19,18 +34,24 @@ const FEATURES = [
     body: "Upload the offer, contract, or NDA they sent. ManagerX extracts the terms, flags risky clauses with a concrete counter-ask for each, pulls every deadline — and diffs the document against the posting you applied to, because we hold what was promised.",
   },
   {
+    tag: "agree",
+    title: "Work agreements both sides sign onchain",
+    body: "An accepted offer becomes a work agreement drafted from the same profile spine. Both parties sign it through SignatureRegistry from their own wallets, with a privacy mode that keeps the terms off the public record. Executed agreements become verified work-history entries.",
+  },
+  {
     tag: "prove",
     title: "Track record you can prove",
-    body: "Anchor any document's hash onchain from your wallet — a timestamped, tamper-evident record of exactly what you were sent, checkable by anyone against the original file. No counterparty needed. Every anchored document strengthens the next application.",
+    body: "Anchor any document's hash onchain from your wallet — a timestamped, tamper-evident record of exactly what you were sent, checkable by anyone against the original file. Publish it as a public profile at /u/your-handle, with shareable cards per contract. Every anchored document strengthens the next application.",
   },
 ];
 
 const STEPS = [
-  ["Build your profile", "Skills, experience, education — entered once, the spine of everything."],
+  ["Build your profile", "Skills, experience, education — entered once, the spine of everything. Connect GitHub and a wallet to back it with evidence."],
   ["Pick or paste a job", "From the scanned board, or paste any posting URL or text."],
-  ["Get the tailored CV", "Generated for that posting alone. Edit, export PDF — the application is yours to send, we just make it sharp."],
+  ["Benchmark the fit", "Score yourself against that posting before writing anything — coverage gaps and ATS problems first."],
+  ["Get the tailored CV", "Generated for that posting alone, cover letter included. Edit, export PDF — the application is yours to send, we just make it sharp."],
   ["Upload what they send back", "Offer, contract, NDA — AI review extracts the terms, flags the traps, and diffs it against the posting."],
-  ["Anchor it onchain", "One wallet transaction stamps the document hash on X Layer — proof of what you were sent, forever."],
+  ["Sign and anchor onchain", "Countersign the work agreement and stamp document hashes on X Layer — proof of what was agreed, forever."],
 ];
 
 export default function Landing() {
@@ -38,8 +59,14 @@ export default function Landing() {
   const authed = !!getToken();
 
   useEffect(() => {
+    // Both counts are live so the copy can't drift from the board; either can
+    // fail independently without blanking the strip.
     api("GET", "/v1/listings?limit=1")
-      .then((d) => setStats({ total: d.total, categories: d.facets.categories.length }))
+      .then((d) => setStats((s) => ({ ...s, total: d.total,
+                                      categories: d.facets.categories.length })))
+      .catch(() => {});
+    api("GET", "/v1/agent-jobs?limit=1")
+      .then((d) => setStats((s) => ({ ...s, agentJobs: d.total })))
       .catch(() => {});
   }, []);
 
@@ -71,8 +98,15 @@ export default function Landing() {
         </div>
         {stats && (
           <div className="flex flex-wrap gap-x-8 gap-y-2 mt-10 font-mono text-sm text-neutral-600 dark:text-neutral-400">
-            <span><b className="text-black dark:text-white">{stats.total}</b> open roles indexed</span>
-            <span><b className="text-black dark:text-white">{stats.categories}</b> categories</span>
+            {stats.total != null && (
+              <span><b className="text-black dark:text-white">{stats.total}</b> open roles indexed</span>
+            )}
+            {stats.categories != null && (
+              <span><b className="text-black dark:text-white">{stats.categories}</b> categories</span>
+            )}
+            {stats.agentJobs != null && (
+              <span><b className="text-black dark:text-white">{stats.agentJobs}</b> agent gigs</span>
+            )}
             <span>registry live on <b className="text-black dark:text-white">X Layer</b></span>
           </div>
         )}
@@ -102,7 +136,7 @@ export default function Landing() {
       <section id="how" className="border-t border-wos-border dark:border-wos-dborder scroll-mt-16">
         <div className="max-w-5xl mx-auto px-4 py-16">
           <h2 className="text-2xl font-semibold tracking-tight mb-8">How it works</h2>
-          <ol className="grid sm:grid-cols-5 gap-4">
+          <ol className="grid sm:grid-cols-3 gap-x-4 gap-y-8">
             {STEPS.map(([title, body], i) => (
               <li key={title} className="relative">
                 <div className="font-mono text-3xl text-neutral-300 dark:text-neutral-600 mb-2">
@@ -116,16 +150,78 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── For agents ──────────────────────────────────────────────── */}
+      <section id="agents" className="border-t border-wos-border dark:border-wos-dborder scroll-mt-16">
+        <div className="max-w-5xl mx-auto px-4 py-16">
+          <p className="font-mono text-xs uppercase tracking-widest text-neutral-500 mb-3">
+            for autonomous agents
+          </p>
+          <h2 className="text-2xl font-semibold tracking-tight mb-3">
+            The other side: work for agents, and an API agents pay for.
+          </h2>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 max-w-2xl mb-8">
+            ManagerX is itself a service provider in the agent economy — listed on the
+            OKX agent marketplace. Agents can find work here, and pay per call for the
+            same engine the web app runs on.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="panel">
+              <h3 className="font-medium text-lg mb-2">Agent Jobs board</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Gigs a firm wants an autonomous agent to do, aggregated across the agent
+                economy — Superteam Earn, dealwork.ai, opentask.ai, and x402 bounties
+                discoverable on Base. Free to read, no account: an agent polls the board,
+                finds work, then calls the services below to compete for it.
+              </p>
+              <Link to="/agent-jobs" className="btn-ghost !px-4 !py-2 !text-sm inline-block mt-4">
+                Open the board
+              </Link>
+            </div>
+
+            <div className="panel">
+              <h3 className="font-medium text-lg mb-2">Pay-per-call services</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
+                Stateless HTTP endpoints — profile and posting in, artifact out. No
+                account, no prior state. Payment is x402: the endpoint answers <code
+                className="font-mono text-xs">402</code> with its price, your agent pays,
+                the call settles on X Layer.
+              </p>
+              <ul className="font-mono text-xs space-y-1.5 text-neutral-600 dark:text-neutral-400">
+                <li className="flex justify-between gap-4">
+                  <span>POST /v1/benchmark</span>
+                  <b className="text-black dark:text-white whitespace-nowrap">0.02 USDT</b>
+                </li>
+                <li className="flex justify-between gap-4">
+                  <span>POST /v1/tailor</span>
+                  <b className="text-black dark:text-white whitespace-nowrap">0.1 USDT</b>
+                </li>
+                <li className="flex justify-between gap-4">
+                  <span>POST /v1/cover-letter</span>
+                  <b className="text-black dark:text-white whitespace-nowrap">0.1 USDT</b>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <p className="text-xs text-neutral-500 mt-4 leading-relaxed">
+            Browsing agents are metered too — automated clients hitting the site pay per
+            page view, while human visitors and crawlers read it free.
+          </p>
+        </div>
+      </section>
+
       {/* ── Onchain strip ───────────────────────────────────────────── */}
       <section className="border-t border-wos-border dark:border-wos-dborder bg-wos-panel dark:bg-wos-dpanel">
         <div className="max-w-5xl mx-auto px-4 py-10">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[260px]">
-              <h3 className="font-medium">Anchors are real transactions.</h3>
+              <h3 className="font-medium">Anchors and signatures are real transactions.</h3>
               <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                Document hashes live in the SignatureRegistry contract on X Layer
-                (chain 196). Every anchor is a transaction from your own wallet;
-                anyone can verify a document against its onchain hash.
+                Document hashes and countersigned work agreements live in the
+                SignatureRegistry contract on X Layer (chain 196). Every anchor and
+                every signature is a transaction from your own wallet; anyone can
+                verify a document against its onchain hash.
               </p>
             </div>
             <a className="font-mono text-xs underline break-all"
