@@ -29,19 +29,9 @@ const FEATURES = [
     body: "Connect GitHub — by OAuth, or in public-data mode with just a username — and a wallet you prove by signature. ManagerX matches that evidence to each posting's requirements and merges it into that job's CV, so a claim points at a repo or an onchain footprint instead of standing alone.",
   },
   {
-    tag: "review",
-    title: "The offer gets read before you sign",
-    body: "Upload the offer, contract, or NDA they sent. ManagerX extracts the terms, flags risky clauses with a concrete counter-ask for each, pulls every deadline — and diffs the document against the posting you applied to, because we hold what was promised.",
-  },
-  {
-    tag: "agree",
-    title: "Work agreements both sides sign onchain",
-    body: "An accepted offer becomes a work agreement drafted from the same profile spine, then created onchain in SignatureRegistry with its signer set fixed and a privacy mode that keeps the terms off the public record. Each listed signer signs from their own wallet; when the last one does, the agreement executes and becomes a verified work-history entry.",
-  },
-  {
     tag: "prove",
     title: "Track record you can prove",
-    body: "Anchor any document's hash onchain from your wallet — a timestamped, tamper-evident record of exactly what you were sent, checkable by anyone against the original file. Publish it as a public profile at /u/your-handle, with shareable cards per contract. Every anchored document strengthens the next application.",
+    body: "Anchor any document's hash onchain from your own wallet — a timestamped, tamper-evident record of exactly what you were sent, checkable by anyone against the original file. No counterparty needed: it works whether or not the other side ever touches a wallet. Publish it as a public profile at /u/your-handle, with a shareable card per contract.",
   },
 ];
 
@@ -50,8 +40,8 @@ const STEPS = [
   ["Pick or paste a job", "From the scanned board, or paste any posting URL or text."],
   ["Benchmark the fit", "Score yourself against that posting before writing anything — coverage gaps and ATS problems first."],
   ["Get the tailored CV", "Generated for that posting alone, cover letter included. Edit, export PDF — the application is yours to send, we just make it sharp."],
-  ["Upload what they send back", "Offer, contract, NDA — AI review extracts the terms, flags the traps, and diffs it against the posting."],
-  ["Sign and anchor onchain", "Countersign the work agreement and stamp document hashes on X Layer — proof of what was agreed, forever."],
+  ["Bring what they sent you", "Offer, contract, NDA — AI review extracts the terms, flags the traps, and diffs it against the posting. Read it before you sign, not after."],
+  ["Anchor it onchain", "One transaction from your own wallet stamps the document hash on X Layer — proof of exactly what you were sent, without needing the other side."],
 ];
 
 export default function Landing() {
@@ -84,8 +74,9 @@ export default function Landing() {
         </h1>
         <p className="text-lg text-neutral-600 dark:text-neutral-400 mt-6 max-w-2xl">
           ManagerX scans the Web3 job market, writes a CV tuned to each posting from
-          your one profile, and — when the offer lands — reads every clause before
-          you sign it. Anchored documents become verifiable track record.
+          your one profile, and — when the offer lands — reads every clause before you
+          sign it. Bring any agreement, from any employer; anchored documents become
+          verifiable track record.
         </p>
         <div className="flex flex-wrap gap-3 mt-8">
           <Link to={authed ? "/jobs" : "/signup"}
@@ -129,6 +120,67 @@ export default function Landing() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Contract review (the centrepiece) ───────────────────────── */}
+      <section id="review" className="border-t border-wos-border dark:border-wos-dborder
+                                      bg-wos-panel dark:bg-wos-dpanel scroll-mt-16">
+        <div className="max-w-5xl mx-auto px-4 py-16">
+          <p className="font-mono text-xs uppercase tracking-widest text-neutral-500 mb-3">
+            before you sign
+          </p>
+          <h2 className="text-3xl font-semibold tracking-tight max-w-2xl leading-tight">
+            Bring the agreement they sent you.
+            <br />
+            We read it before you sign it.
+          </h2>
+          <p className="text-neutral-600 dark:text-neutral-400 mt-5 max-w-2xl">
+            You don't need to get anyone's permission to use this, and the other side
+            never has to hear about it. Upload the offer, contract, or NDA exactly as
+            they sent it — any format — and get it back read.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-x-10 gap-y-6 mt-10 max-w-3xl">
+            <div>
+              <h3 className="font-medium mb-1">Every term, extracted</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Compensation, equity, notice period, IP assignment, non-compete,
+                termination — pulled out of the prose and laid flat so you can actually
+                compare them.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-medium mb-1">Risky clauses, with a counter-ask</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Not just "this clause is unusual" — a concrete thing to ask for instead,
+                per clause, so you walk into the conversation with a position.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-medium mb-1">Diffed against what you were promised</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                We still hold the posting you applied to. If the contract quietly
+                disagrees with the advertised role, title, or comp, that gap is shown.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-medium mb-1">Deadlines you'd otherwise miss</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Signing windows, option-exercise dates, notice cut-offs — pulled into one
+                list with dates, instead of buried in a clause on page nine.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-8 max-w-2xl">
+            Then anchor the hash onchain from your own wallet, so what you were sent is
+            provable later — no signature from them required.
+          </p>
+          <Link to={authed ? "/documents" : "/signup"}
+                className="btn !px-8 !py-3.5 !text-base !rounded-xl inline-block mt-6">
+            {authed ? "Upload a document" : "Get your contract read"}
+          </Link>
         </div>
       </section>
 
@@ -216,12 +268,12 @@ export default function Landing() {
         <div className="max-w-5xl mx-auto px-4 py-10">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[260px]">
-              <h3 className="font-medium">Anchors and signatures are real transactions.</h3>
+              <h3 className="font-medium">Anchors are real transactions.</h3>
               <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                Document hashes and countersigned work agreements live in the
-                SignatureRegistry contract on X Layer (chain 196). Every anchor and
-                every signature is a transaction from your own wallet; anyone can
-                verify a document against its onchain hash.
+                Document hashes live in the SignatureRegistry contract on X Layer
+                (chain 196). Every anchor is a transaction from your own wallet, and
+                anyone can verify a document against its onchain hash — no account
+                here, and no cooperation from the other party, required.
               </p>
             </div>
             <a className="font-mono text-xs underline break-all"
