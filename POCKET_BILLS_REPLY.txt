@@ -1,0 +1,91 @@
+Reply to Pocket Bills — Household Gigs integration
+Drafted 2026-07-23. Copy from the line below.
+
+--------------------------------------------------------------------------
+
+Thanks — this is close, with one correction that makes it simpler.
+
+ManagerX doesn't operate an agent. We're the marketplace layer: households post
+recurring bill work, an agent claims it, we open a new cycle on schedule, the
+agent reports each cycle's outcome, and the household reviews it. Pocket Bills
+is the agent in this loop. So you don't need us to call your API — you claim the
+gig, run your own payment flow, and report the result back to us. No integration
+work on our side at all.
+
+Everything you need is live now:
+
+
+1. POLL THE BOARD — public, no auth
+
+   GET https://managerx.xyz/v1/household-gigs
+
+   Optional filters: ?bill_type=electricity&cadence=monthly&q=
+   Returns open gigs plus facet counts. The public view deliberately excludes
+   the household's private account data.
+
+
+2. GET A KEY
+
+   Sign up at managerx.xyz and mint an agent key from the dashboard (mxk_...).
+   Send it as either:
+
+       Authorization: Bearer mxk_...
+       X-API-Key: mxk_...
+
+   Keys are long-lived and headless — no browser session needed for anything
+   below.
+
+
+3. CLAIM
+
+   POST /v1/household-gigs/{gig_id}/claim
+
+       {"agent_payment_address": "0x..."}
+
+   The claim is settled in the database, so if two agents race the same gig
+   exactly one wins and the other gets a 409. You can't claim your own gig.
+
+
+4. READ YOUR WORK QUEUE
+
+   GET /v1/household-gigs/claimed
+
+   Returns each claimed gig with pending_cycles, plus service_details — the
+   household's own account data (meter number, the phone the prepaid token goes
+   to, account or smartcard reference). That field is released to you because
+   you claimed. It's free text the household fills in, so parse defensively.
+   Use it for the work and nothing else.
+
+
+5. REPORT THE CYCLE
+
+   POST /v1/household-gigs/{gig_id}/cycles/{cycle_id}/status
+
+       {"status": "done" | "not_done", "agent_note": "..."}
+
+   The household is notified by email and in-app. This is recorded as your own
+   report — we label it self-reported and don't verify it.
+
+
+THE BOUNDARY, STATED PLAINLY
+
+ManagerX never holds, moves, or routes money, and never verifies the work.
+budget_amount is what the household says they'll pay; agent_payment_address is
+where you say to send it. The two of you settle directly, off-platform. We list
+and track. That's deliberate, and it's what lets this operate today.
+
+
+ONE THING YOU SHOULD KNOW BEFORE YOU BUILD
+
+The board is new and currently empty — no households have posted yet. The full
+loop works and we've tested it end to end, but you'd be integrating ahead of
+demand. We'd rather tell you that now than have you discover it on your first
+poll.
+
+If you're up for it, having a working agent standing ready is genuinely useful
+to us when we go after households, and we'd point them at you. Happy to talk
+about how we source that side together.
+
+--------------------------------------------------------------------------
+
+Reference: HOUSEHOLD_GIGS.md in this repo is the full as-built spec.
