@@ -437,10 +437,20 @@ export default function HouseholdGigs() {
   const authed = !!getToken();
   const [tab, setTab] = useState("board");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [waiting, setWaiting] = useState({ awaiting_your_review: 0, awaiting_your_action: 0 });
   const bump = () => setRefreshKey((k) => k + 1);
 
-  const TABS = [["board", "Browse gigs"], ["posted", "My posted gigs"],
-                ["claimed", "My claimed gigs"]];
+  // Drives the tab badges. The app has to be able to tell you a cycle came due
+  // without an email having been delivered — mail is a convenience, not the
+  // only way to find out.
+  useEffect(() => {
+    if (!authed) return;
+    api("GET", "/v1/household-gigs/summary").then(setWaiting).catch(() => {});
+  }, [authed, refreshKey]);
+
+  const TABS = [["board", "Browse gigs", 0],
+                ["posted", "My posted gigs", waiting.awaiting_your_review],
+                ["claimed", "My claimed gigs", waiting.awaiting_your_action]];
 
   return (
     <div>
@@ -461,13 +471,20 @@ export default function HouseholdGigs() {
       </div>
 
       <div className="flex gap-1 mt-6 border-b border-wos-border dark:border-wos-dborder">
-        {TABS.map(([key, name]) => (
+        {TABS.map(([key, name, count]) => (
           <button key={key} onClick={() => setTab(key)}
-                  className={`px-4 py-2 text-sm border-b-2 -mb-px transition-colors ${
+                  className={`px-4 py-2 text-sm border-b-2 -mb-px transition-colors
+                              flex items-center gap-2 ${
                     tab === key
                       ? "border-wos-accent text-black dark:border-white dark:text-white font-medium"
                       : "border-transparent text-neutral-500 hover:text-black dark:hover:text-white"}`}>
             {name}
+            {count > 0 && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full
+                               bg-amber-100 dark:bg-amber-950/60 text-amber-800
+                               dark:text-amber-300 border border-amber-300
+                               dark:border-amber-900">{count}</span>
+            )}
           </button>
         ))}
       </div>

@@ -200,6 +200,27 @@ async def browse_gigs(bill_type: str = "", cadence: str = "", q: str = "",
 
 
 # Literal paths before /{gig_id}: FastAPI matches in declaration order.
+@router.get("/summary")
+async def summary(user: dict = Depends(current_actor)):
+    """What is waiting on this user, on both sides. Email is a convenience layer —
+    a provider outage, an unverified sender, or a household that never opens its
+    inbox must not mean nobody ever learns a cycle came due. These counts drive
+    the in-app badges, so the app is self-sufficient without a single email."""
+    conn = get_conn()
+    review = conn.execute(
+        """SELECT COUNT(*) c FROM household_gig_cycles cy
+           JOIN household_gigs g ON g.gig_id = cy.gig_id
+           WHERE g.household_user_id = ? AND cy.household_ack = 0
+             AND cy.status != 'pending'""", (user["user_id"],)).fetchone()["c"]
+    action = conn.execute(
+        """SELECT COUNT(*) c FROM household_gig_cycles cy
+           JOIN household_gigs g ON g.gig_id = cy.gig_id
+           WHERE g.claimed_by_agent_id = ? AND cy.status = 'pending'
+             AND g.status != 'cancelled'""", (user["user_id"],)).fetchone()["c"]
+    conn.close()
+    return {"awaiting_your_review": review, "awaiting_your_action": action}
+
+
 @router.get("/mine")
 async def my_gigs(user: dict = Depends(current_actor)):
     """Household's own posted gigs, with a pending-cycle count each."""

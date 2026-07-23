@@ -679,3 +679,45 @@ def test_service_details_stay_editable_after_claim(client):
     assert fixed.status_code == 200
     assert client.get("/v1/household-gigs/claimed", headers=agent).json()[
         "household_gigs"][0]["service_details"] == "Meter 04123456789"
+
+
+def test_summary_counts_drive_the_in_app_badges(client):
+    """The app must be able to tell both sides something is waiting even if not a
+    single email was ever delivered."""
+    import household
+    home = _signup(client, "home11@t.dev")
+    agent = _signup(client, "agent11@t.dev")
+    gig_id = _post_gig(client, home).json()["gig_id"]
+    client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+
+    # A pending cycle is the agent's to act on, and nothing yet for the household.
+    cycle_id = household.generate_due_cycles()[0][1]["cycle_id"]
+    assert client.get("/v1/household-gigs/summary", headers=agent).json() == {
+        "awaiting_your_review": 0, "awaiting_your_action": 1}
+    assert client.get("/v1/household-gigs/summary", headers=home).json()[
+        "awaiting_your_review"] == 0
+
+    # Once reported it flips: off the agent's queue, onto the household's.
+    client.post(f"/v1/household-gigs/{gig_id}/cycles/{cycle_id}/status",
+                headers=agent, json={"status": "done"})
+    assert client.get("/v1/household-gigs/summary", headers=agent).json()[
+        "awaiting_your_action"] == 0
+    assert client.get("/v1/household-gigs/summary", headers=home).json()[
+        "awaiting_your_review"] == 1
+
+    # Acknowledging clears it.
+    client.post(f"/v1/household-gigs/{gig_id}/cycles/{cycle_id}/ack", headers=home)
+    assert client.get("/v1/household-gigs/summary", headers=home).json()[
+        "awaiting_your_review"] == 0
+
+    # A cancelled gig stops nagging the agent about work that no longer exists.
+    gig2 = _post_gig(client, home).json()["gig_id"]
+    client.post(f"/v1/household-gigs/{gig2}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+    household.generate_due_cycles()
+    assert client.get("/v1/household-gigs/summary", headers=agent).json()[
+        "awaiting_your_action"] == 1
+    client.post(f"/v1/household-gigs/{gig2}/cancel", headers=home)
+    assert client.get("/v1/household-gigs/summary", headers=agent).json()[
+        "awaiting_your_action"] == 0
