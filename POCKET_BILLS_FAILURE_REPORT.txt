@@ -1,0 +1,70 @@
+Message to Pocket Bills — two failed settlements, 2026-07-23
+Copy from the line below.
+
+--------------------------------------------------------------------------
+
+Hi — we've integrated against the Pocket Bills Rail (agent #8044) from the
+ManagerX side and wanted to share results early, because we hit something you'll
+want to know about.
+
+We ran two live purchases today. Both took payment. Neither delivered.
+
+  Settlement   pst_2628bcc40634420c8b0acc16dcd634e0
+  Order        okx:mxq-test-20260723-airt200
+  Plan         airt-200 (Airtel Data 200 Naira / 200MB / 3 Days)
+  Customer     08122493620
+  Paid         0.217082 USDT on X Layer
+  State        provider_failed_unverified
+  Provider     "TRANSACTION FAILED", ref 17848183643998127256192920
+
+  Settlement   pst_abbee67871f8446195a56da3303411b7
+  Order        okx:mxq-test-20260723-airt100
+  Plan         airt-100 (Airtel Data 100 Naira / 75MB / 1 Day)
+  Customer     08122493620
+  Paid         0.144447 USDT on X Layer
+  State        needs_review
+  Provider     "The operation was aborted due to timeout", no reference
+
+On both, deliveryCode and receiptHash came back empty and requeryAttempts has
+stayed at 0 for over an hour. No refund has appeared. By your own records,
+nothing was delivered and nothing was re-checked.
+
+The two differ in a way that matters: the first has a provider reference, so it
+reached your upstream and came back rejected. The second has none, so we can't
+tell whether it ever got there.
+
+Four questions, in the order they block us:
+
+1. What is the recovery path for these two? Automatic requery, refund, or a
+   manual claim we need to file? 0.361529 USDT is currently unaccounted for.
+
+2. What does needs_review resolve to, and how long does it take? This is the
+   one that actually blocks automation. A timeout means delivery is genuinely
+   unknown — an agent that retries risks double-vending, and an agent that gives
+   up risks telling a household their bill is unpaid when it was paid. Until
+   that state is deterministic, no autonomous agent can safely act on it.
+
+3. Is Airtel data vending currently degraded? We're two-for-two on failures
+   against a listing showing four sales, so we'd rather ask than assume.
+
+4. Is there a sandbox? We'd like to find our own mistakes without spending real
+   USDT and without vending to real numbers.
+
+Two smaller notes from the integration:
+
+- The settlement status endpoint only accepts the token as ?token=... . Sent as
+  an Authorization: Bearer header it returns STATUS_TOKEN_INVALID. Anyone
+  following the obvious convention will lose time on that.
+
+- externalOrderId is exactly the right primitive and we're glad it's there. Can
+  you confirm how long you hold it, and whether a replay with the same value is
+  guaranteed not to double-charge? If so, that removes most of our failure
+  handling.
+
+For context on why we care: ManagerX runs a household gig board where an agent
+claims recurring bills — prepaid electricity, data, DStv — and handles them each
+cycle. Your rail is the fulfilment leg. We've built the loop and it works end to
+end; the rail underneath is the only thing not yet proven. We want this to work
+and we're happy to keep testing.
+
+--------------------------------------------------------------------------
