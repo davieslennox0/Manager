@@ -217,6 +217,103 @@ function JobAlerts({ profile }) {
   );
 }
 
+function AgentKeys() {
+  const [keys, setKeys] = useState([]);
+  const [label, setLabel] = useState("");
+  const [fresh, setFresh] = useState(null);   // shown once, never retrievable again
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try { setKeys((await api("GET", "/v1/agent-keys")).agent_keys); }
+    catch (error) { setMsg(error.message); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function mint(e) {
+    e.preventDefault();
+    setMsg("");
+    try {
+      const res = await api("POST", "/v1/agent-keys", { label: label.trim() });
+      setFresh(res.key);
+      setLabel("");
+      await load();
+    } catch (error) { setMsg(error.message); }
+  }
+
+  async function revoke(keyId) {
+    if (!window.confirm("Revoke this key? Any agent using it stops working immediately."))
+      return;
+    try { await api("DELETE", `/v1/agent-keys/${keyId}`); await load(); }
+    catch (error) { setMsg(error.message); }
+  }
+
+  return (
+    <div className="panel">
+      <h2 className="font-medium mb-1">Agent keys</h2>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        A long-lived credential for an autonomous agent — it can't hold a browser
+        session, so it carries a key instead. The key acts as <b>you</b> on the
+        Household Gigs board: browsing, claiming, and reporting cycle status. It
+        cannot mint further keys or change your account.
+      </p>
+
+      {fresh && (
+        <div className="card-inner mt-4 border-emerald-300 dark:border-emerald-900">
+          <p className="text-xs uppercase tracking-wide text-neutral-500 mb-1">
+            Copy this now — it is not shown again
+          </p>
+          <code className="font-mono text-xs break-all">{fresh}</code>
+          <div className="flex gap-2 mt-3">
+            <button className="btn-ghost !py-1 !text-xs"
+                    onClick={() => navigator.clipboard?.writeText(fresh)}>Copy</button>
+            <button className="btn-ghost !py-1 !text-xs" onClick={() => setFresh(null)}>
+              Done
+            </button>
+          </div>
+          <p className="text-xs text-neutral-500 mt-3">
+            Send it as <code className="font-mono">Authorization: Bearer …</code> or{" "}
+            <code className="font-mono">X-API-Key: …</code>
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={mint} className="flex gap-2 mt-4 flex-wrap">
+        <input className="input !py-2 flex-1 !w-auto min-w-[200px]" value={label}
+               placeholder="What is this key for? (e.g. bill-bot)"
+               onChange={(e) => setLabel(e.target.value)} />
+        <button className="btn">Create key</button>
+      </form>
+      {msg && <p className="text-xs mt-2 text-red-700 dark:text-red-400">{msg}</p>}
+
+      <div className="space-y-2 mt-4">
+        {keys.map((k) => (
+          <div key={k.key_id} className="card-inner flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-[180px]">
+              <div className="text-sm">
+                {k.label || "Unlabelled key"}{" "}
+                <code className="font-mono text-xs text-neutral-500">{k.prefix}…</code>
+              </div>
+              <div className="text-xs text-neutral-500">
+                {k.revoked ? "revoked" : k.last_used_at
+                  ? `last used ${k.last_used_at.slice(0, 16)}`
+                  : "never used"}
+              </div>
+            </div>
+            {!k.revoked && (
+              <button className="btn-ghost !py-1 !text-xs" onClick={() => revoke(k.key_id)}>
+                Revoke
+              </button>
+            )}
+          </div>
+        ))}
+        {keys.length === 0 && (
+          <p className="text-xs text-neutral-500">No agent keys yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Profile() {
   const [p, setP] = useState(null);
   const [msg, setMsg] = useState("");
@@ -347,6 +444,7 @@ export default function Profile() {
 
       <PublicTrackRecord profile={p} />
       <JobAlerts profile={p} />
+      <AgentKeys />
 
       <div className="panel">
         <h2 className="font-medium mb-3">Verified work history (onchain)</h2>

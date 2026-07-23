@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 import household
-from auth import current_user
+from auth import current_actor
 from db import get_conn, j
 
 router = APIRouter(prefix="/v1/household-gigs", tags=["household-gigs"])
@@ -116,7 +116,7 @@ def _public(row) -> dict:
 # ── create / browse ──────────────────────────────────────────────────────────
 
 @router.post("")
-async def create_gig(body: GigCreate, user: dict = Depends(current_user)):
+async def create_gig(body: GigCreate, user: dict = Depends(current_actor)):
     """Post a recurring household gig. Starts `open` — visible on the board until
     an agent claims it."""
     title = body.title.strip()
@@ -191,7 +191,7 @@ async def browse_gigs(bill_type: str = "", cadence: str = "", q: str = "",
 
 # Literal paths before /{gig_id}: FastAPI matches in declaration order.
 @router.get("/mine")
-async def my_gigs(user: dict = Depends(current_user)):
+async def my_gigs(user: dict = Depends(current_actor)):
     """Household's own posted gigs, with a pending-cycle count each."""
     conn = get_conn()
     rows = conn.execute("SELECT * FROM household_gigs WHERE household_user_id = ? "
@@ -208,7 +208,7 @@ async def my_gigs(user: dict = Depends(current_user)):
 
 
 @router.get("/claimed")
-async def claimed_gigs(user: dict = Depends(current_user)):
+async def claimed_gigs(user: dict = Depends(current_actor)):
     """Agent's side: gigs this user claimed, each with its open (pending) cycles —
     the work queue the agent acts on."""
     conn = get_conn()
@@ -229,7 +229,7 @@ async def claimed_gigs(user: dict = Depends(current_user)):
 # ── the gig ──────────────────────────────────────────────────────────────────
 
 @router.patch("/{gig_id}")
-async def patch_gig(gig_id: str, body: GigPatch, user: dict = Depends(current_user)):
+async def patch_gig(gig_id: str, body: GigPatch, user: dict = Depends(current_actor)):
     """Household edits. Budget and title are editable only while the gig is still
     `open` — once an agent has claimed on those terms, changing them would be a
     renegotiation, and there is deliberately no renegotiation flow: cancel and
@@ -282,7 +282,7 @@ async def patch_gig(gig_id: str, body: GigPatch, user: dict = Depends(current_us
 
 
 @router.post("/{gig_id}/claim")
-async def claim_gig(gig_id: str, body: ClaimBody, user: dict = Depends(current_user)):
+async def claim_gig(gig_id: str, body: ClaimBody, user: dict = Depends(current_actor)):
     """An agent takes the gig. The claim is decided by the database, not by a
     read-then-write in Python: the UPDATE carries `status='open'` in its own WHERE
     clause and runs inside an IMMEDIATE transaction, so of two agents racing the
@@ -328,7 +328,7 @@ async def claim_gig(gig_id: str, body: ClaimBody, user: dict = Depends(current_u
 
 
 @router.post("/{gig_id}/cancel")
-async def cancel_gig(gig_id: str, user: dict = Depends(current_user)):
+async def cancel_gig(gig_id: str, user: dict = Depends(current_actor)):
     """Household ends the gig. Clearing next_cycle_date is what actually stops the
     cycle loop. Nothing financial happens here, because nothing financial ever
     passed through ManagerX — there is no balance to refund or reverse."""
@@ -351,7 +351,7 @@ async def cancel_gig(gig_id: str, user: dict = Depends(current_user)):
 
 
 @router.get("/{gig_id}/dashboard")
-async def gig_dashboard(gig_id: str, user: dict = Depends(current_user)):
+async def gig_dashboard(gig_id: str, user: dict = Depends(current_actor)):
     """Household's view of one gig: terms, who claimed it, where to pay them, and
     every cycle with its reported status."""
     conn = get_conn()
@@ -391,7 +391,7 @@ def _cycle_or_404(conn, gig_id: str, cycle_id: str):
 
 @router.post("/{gig_id}/cycles/{cycle_id}/status")
 async def report_cycle(gig_id: str, cycle_id: str, body: CycleStatusBody,
-                       user: dict = Depends(current_user)):
+                       user: dict = Depends(current_actor)):
     """The claiming agent reports how a cycle went. Pure relay — ManagerX records
     the claim and shows it to the household; it does not and cannot check it."""
     if body.status not in household.AGENT_CYCLE_STATUSES:
@@ -418,7 +418,7 @@ async def report_cycle(gig_id: str, cycle_id: str, body: CycleStatusBody,
 
 
 @router.post("/{gig_id}/cycles/{cycle_id}/ack")
-async def ack_cycle(gig_id: str, cycle_id: str, user: dict = Depends(current_user)):
+async def ack_cycle(gig_id: str, cycle_id: str, user: dict = Depends(current_actor)):
     """Household confirms it has reviewed a cycle. This is the only field in the
     system the household itself asserts — everything else is the agent's word."""
     conn = get_conn()

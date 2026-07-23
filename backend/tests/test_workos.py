@@ -566,3 +566,70 @@ def test_lapsed_gig_does_not_backfill_a_flood_of_cycles(client):
 
     assert len(household.generate_due_cycles()) == 1
     assert household.generate_due_cycles() == []   # date is now in the future
+
+
+# ── Agent API keys ───────────────────────────────────────────────────────────
+# The credential an autonomous client can actually hold: no session to refresh,
+# no password to type. It authenticates AS the user who minted it.
+
+def test_agent_key_mint_use_and_revoke(client):
+    owner = _signup(client, "keyowner@t.dev")
+    minted = client.post("/v1/agent-keys", headers=owner, json={"label": "bill-bot"}).json()
+    secret = minted["key"]
+    assert secret.startswith("mxk_")
+    assert minted["prefix"] == secret[:12]
+
+    # Listed without the secret — it exists in that one response and nowhere else.
+    listed = client.get("/v1/agent-keys", headers=owner).json()["agent_keys"]
+    assert len(listed) == 1 and "key" not in listed[0] and listed[0]["revoked"] == 0
+
+    # Both header forms work, and identify the same user as the JWT would.
+    for headers in ({"Authorization": f"Bearer {secret}"}, {"X-API-Key": secret}):
+        assert client.get("/v1/household-gigs/claimed", headers=headers).status_code == 200
+
+    assert client.get("/v1/household-gigs/claimed",
+                      headers={"X-API-Key": "mxk_not-a-real-key"}).status_code == 401
+
+    # A key cannot mint another key — a leak can't extend its own foothold.
+    assert client.post("/v1/agent-keys", headers={"Authorization": f"Bearer {secret}"},
+                       json={"label": "escalate"}).status_code == 401
+
+    key_id = minted["key_id"]
+    assert client.delete(f"/v1/agent-keys/{key_id}", headers=owner).status_code == 200
+    assert client.get("/v1/household-gigs/claimed",
+                      headers={"X-API-Key": secret}).status_code == 401
+    assert client.delete(f"/v1/agent-keys/{key_id}", headers=owner).status_code == 409
+
+
+def test_agent_key_claims_and_reports_a_gig(client):
+    """The whole point: an autonomous agent runs the gig loop with no session."""
+    import household
+    home = _signup(client, "home7@t.dev")
+    bot_owner = _signup(client, "bot7@t.dev")
+    key = client.post("/v1/agent-keys", headers=bot_owner,
+                      json={"label": "bot"}).json()["key"]
+    agent = {"X-API-Key": key}
+
+    gig_id = _post_gig(client, home).json()["gig_id"]
+    board = client.get("/v1/household-gigs", headers=agent).json()
+    assert board["total"] == 1
+
+    assert client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                       json={"agent_payment_address": "0xBot"}).status_code == 200
+    cycle_id = household.generate_due_cycles()[0][1]["cycle_id"]
+    rep = client.post(f"/v1/household-gigs/{gig_id}/cycles/{cycle_id}/status",
+                      headers=agent, json={"status": "done"})
+    assert rep.status_code == 200 and rep.json()["self_reported"] is True
+
+    # The household sees the key's owner, not a nameless machine.
+    dash = client.get(f"/v1/household-gigs/{gig_id}/dashboard", headers=home).json()
+    assert dash["agent"]["email"] == "bot7@t.dev"
+
+
+def test_agent_key_cannot_reach_another_users_gig(client):
+    home = _signup(client, "home8@t.dev")
+    outsider = _signup(client, "outsider8@t.dev")
+    key = client.post("/v1/agent-keys", headers=outsider, json={}).json()["key"]
+    gig_id = _post_gig(client, home).json()["gig_id"]
+    assert client.get(f"/v1/household-gigs/{gig_id}/dashboard",
+                      headers={"X-API-Key": key}).status_code == 403

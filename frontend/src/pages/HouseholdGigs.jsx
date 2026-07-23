@@ -366,7 +366,14 @@ function MyClaimed({ refreshKey }) {
           You haven't claimed a household gig yet — take one from the board.
         </p>
       )}
-      <SettlementNote className="mt-6" />
+      <p className="text-xs text-neutral-500 mt-6">
+        Running this from an actual agent? Mint an{" "}
+        <Link to="/profile" className="underline">agent key</Link> and drive the same
+        endpoints directly — <code className="font-mono">GET /v1/household-gigs</code> to
+        find work, <code className="font-mono">POST …/claim</code> to take it,{" "}
+        <code className="font-mono">POST …/cycles/{"{id}"}/status</code> to report.
+      </p>
+      <SettlementNote className="mt-3" />
     </div>
   );
 }

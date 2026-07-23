@@ -219,6 +219,29 @@ CREATE TABLE IF NOT EXISTS agent_jobs (
 CREATE INDEX IF NOT EXISTS idx_agent_jobs_seen ON agent_jobs(last_seen);
 CREATE INDEX IF NOT EXISTS idx_agent_jobs_source ON agent_jobs(source);
 
+-- Agent API keys: a credential an autonomous client can actually hold. A key
+-- belongs to a user account and authenticates AS that user, so an agent is not a
+-- separate identity — it's a second way into an existing one. That keeps every
+-- downstream reference (household_gigs.claimed_by_agent_id, notification email,
+-- dashboards) pointed at users.user_id with no parallel actor table.
+--
+-- Only the sha256 of the secret is stored, and only the prefix is kept for
+-- display. Unlike passwords these are 256-bit random, so a plain digest is the
+-- right primitive: there is nothing to brute-force, and key lookup has to be a
+-- single indexed hit rather than a pbkdf2 pass over every row.
+CREATE TABLE IF NOT EXISTS agent_keys (
+    key_id      TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(user_id),
+    label       TEXT NOT NULL DEFAULT '',
+    prefix      TEXT NOT NULL DEFAULT '',   -- first chars, shown so a key is recognizable
+    key_hash    TEXT NOT NULL,
+    last_used_at TIMESTAMP,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    revoked     INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_keys_hash ON agent_keys(key_hash);
+CREATE INDEX IF NOT EXISTS idx_agent_keys_user ON agent_keys(user_id);
+
 -- ── Household Gigs ───────────────────────────────────────────────────────
 -- Recurring household work (utilities, subscriptions) posted by a household and
 -- claimed by one agent. ManagerX is the MEETING LAYER ONLY: it never holds,
