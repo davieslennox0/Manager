@@ -218,6 +218,57 @@ CREATE TABLE IF NOT EXISTS agent_jobs (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_jobs_seen ON agent_jobs(last_seen);
 CREATE INDEX IF NOT EXISTS idx_agent_jobs_source ON agent_jobs(source);
+
+-- ── Household Gigs ───────────────────────────────────────────────────────
+-- Recurring household work (utilities, subscriptions) posted by a household and
+-- claimed by one agent. ManagerX is the MEETING LAYER ONLY: it never holds,
+-- moves, routes, or verifies money, and it does not check that the agent did
+-- the work. budget_amount/budget_currency and agent_payment_address are DISPLAY
+-- fields — the two parties settle directly and off-platform, exactly as a career
+-- listing shows a salary and an application address. Cycle status is whatever
+-- the agent says it is (self-reported); household_ack is the household's own
+-- read receipt and the only counterparty-confirmed signal in the table.
+--
+-- Deliberately absent, and not to be added without a separate decision: any
+-- amount paid, payment reference, escrow/bond id, or proof-of-execution column.
+CREATE TABLE IF NOT EXISTS household_gigs (
+    gig_id       TEXT PRIMARY KEY,
+    household_user_id TEXT NOT NULL REFERENCES users(user_id),
+    title        TEXT NOT NULL,
+    bill_types   TEXT NOT NULL DEFAULT '[]',   -- JSON [str]; a gig can bundle several
+    cadence      TEXT NOT NULL DEFAULT 'monthly',  -- monthly | weekly | one_time
+    status       TEXT NOT NULL DEFAULT 'open', -- open | claimed | active | paused | cancelled
+    budget_amount TEXT NOT NULL DEFAULT '',    -- numeric-as-text (same convention as
+                                               -- agent_jobs.reward); display only
+    budget_currency TEXT NOT NULL DEFAULT '',  -- NGN | USDC | … household's own label
+    claimed_by_agent_id TEXT REFERENCES users(user_id),
+    agent_payment_address TEXT NOT NULL DEFAULT '',  -- set by the agent at claim; display only
+    claimed_at   TIMESTAMP,
+    next_cycle_date TEXT NOT NULL DEFAULT '',  -- ISO date the next cycle opens; '' = no more
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_hgigs_status ON household_gigs(status);
+CREATE INDEX IF NOT EXISTS idx_hgigs_household ON household_gigs(household_user_id);
+CREATE INDEX IF NOT EXISTS idx_hgigs_agent ON household_gigs(claimed_by_agent_id);
+
+-- One row per execution cycle. Status-only by design: no amounts, no payment
+-- refs. The unique (gig_id, cycle_index) is what makes cycle generation safe to
+-- retry — a double tick collides instead of creating a duplicate cycle.
+CREATE TABLE IF NOT EXISTS household_gig_cycles (
+    cycle_id     TEXT PRIMARY KEY,
+    gig_id       TEXT NOT NULL REFERENCES household_gigs(gig_id),
+    cycle_index  INTEGER NOT NULL,
+    cycle_date   TEXT NOT NULL DEFAULT '',     -- ISO date this cycle covers
+    status       TEXT NOT NULL DEFAULT 'pending',  -- pending | done | not_done | skipped
+    agent_note   TEXT NOT NULL DEFAULT '',     -- agent's own free-text report, optional
+    reported_at  TIMESTAMP,                    -- when the agent last set the status
+    household_ack INTEGER NOT NULL DEFAULT 0,  -- household reviewed this cycle
+    acked_at     TIMESTAMP,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_hcycles_gig_index
+    ON household_gig_cycles(gig_id, cycle_index);
+CREATE INDEX IF NOT EXISTS idx_hcycles_status ON household_gig_cycles(status);
 """
 
 

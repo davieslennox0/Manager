@@ -408,3 +408,161 @@ def test_x402_rails_line_lists_every_symbol():
     assert line.startswith("0.02 ")
     for a in x.ACCEPTED:
         assert a["symbol"] in line
+
+
+# ── Household Gigs ───────────────────────────────────────────────────────────
+# The whole point of this feature is what it does NOT do: no payment, no escrow,
+# no verification. The tests assert the boundary as hard as the behaviour.
+
+def _post_gig(client, headers, **over):
+    body = {"title": "Flat 4 — utilities bundle", "bill_types": ["electricity", "broadband"],
+            "cadence": "monthly", "budget_amount": "45000", "budget_currency": "NGN"}
+    body.update(over)
+    return client.post("/v1/household-gigs", headers=headers, json=body)
+
+
+def test_household_gig_lifecycle(client):
+    import household
+    home = _signup(client, "home@t.dev")
+    agent = _signup(client, "agent@t.dev")
+
+    gig = _post_gig(client, home).json()
+    assert gig["status"] == "open"
+    assert gig["bill_types"] == ["electricity", "broadband"]
+    assert gig["settlement"]["processed_by_managerx"] is False
+
+    # Public board: no auth, and the household's identity never leaves the dashboard.
+    board = client.get("/v1/household-gigs").json()
+    assert board["total"] == 1
+    assert "household_user_id" not in board["household_gigs"][0]
+    assert client.get("/v1/household-gigs?bill_type=electricity").json()["total"] == 1
+    assert client.get("/v1/household-gigs?bill_type=gas").json()["total"] == 0
+
+    claimed = client.post(f"/v1/household-gigs/{gig['gig_id']}/claim", headers=agent,
+                          json={"agent_payment_address": "0xAgentWallet"}).json()
+    assert claimed["status"] == "claimed"
+    assert claimed["agent_payment_address"] == "0xAgentWallet"
+    assert client.get("/v1/household-gigs").json()["total"] == 0  # off the open board
+
+    # The cycle clock opens the first cycle (next_cycle_date defaults to today).
+    opened = household.generate_due_cycles()
+    assert len(opened) == 1
+    cycle_id = opened[0][1]["cycle_id"]
+
+    dash = client.get(f"/v1/household-gigs/{gig['gig_id']}/dashboard", headers=home).json()
+    assert dash["status"] == "active"          # claimed -> active once cycles run
+    assert dash["cycles"][0]["status"] == "pending"
+    assert dash["pay_the_agent"]["address"] == "0xAgentWallet"
+    assert "does not process" in dash["pay_the_agent"]["instruction"]
+
+    # Agent self-reports; ManagerX relays it and says so.
+    rep = client.post(f"/v1/household-gigs/{gig['gig_id']}/cycles/{cycle_id}/status",
+                      headers=agent, json={"status": "done", "agent_note": "Paid via app"})
+    assert rep.json()["self_reported"] is True
+    assert rep.json()["status"] == "done"
+
+    queue = client.get("/v1/household-gigs/claimed", headers=agent).json()
+    assert queue["household_gigs"][0]["pending_cycles"] == []
+
+    assert client.get("/v1/household-gigs/mine", headers=home).json()[
+        "household_gigs"][0]["unacked_cycles"] == 1
+    acked = client.post(f"/v1/household-gigs/{gig['gig_id']}/cycles/{cycle_id}/ack",
+                        headers=home).json()
+    assert acked["household_ack"] == 1
+
+
+def test_household_gig_claim_is_race_safe(client):
+    home = _signup(client, "home2@t.dev")
+    a1 = _signup(client, "a1@t.dev")
+    a2 = _signup(client, "a2@t.dev")
+    gig_id = _post_gig(client, home).json()["gig_id"]
+
+    first = client.post(f"/v1/household-gigs/{gig_id}/claim", headers=a1,
+                        json={"agent_payment_address": "0xOne"})
+    second = client.post(f"/v1/household-gigs/{gig_id}/claim", headers=a2,
+                         json={"agent_payment_address": "0xTwo"})
+    assert first.status_code == 200
+    assert second.status_code == 409
+    # The loser leaves no trace on the row.
+    dash = client.get(f"/v1/household-gigs/{gig_id}/dashboard", headers=home).json()
+    assert dash["agent_payment_address"] == "0xOne"
+
+
+def test_household_gig_guards(client):
+    home = _signup(client, "home3@t.dev")
+    agent = _signup(client, "agent3@t.dev")
+    stranger = _signup(client, "nosy@t.dev")
+    gig_id = _post_gig(client, home).json()["gig_id"]
+
+    assert _post_gig(client, home, budget_amount="-5").status_code == 422
+    assert _post_gig(client, home, budget_amount="free").status_code == 422
+    assert _post_gig(client, home, cadence="hourly").status_code == 422
+    assert _post_gig(client, home, bill_types=[]).status_code == 422
+
+    # A household can't claim its own gig; a stranger can't read the dashboard.
+    assert client.post(f"/v1/household-gigs/{gig_id}/claim", headers=home,
+                       json={"agent_payment_address": "0xSelf"}).status_code == 409
+    assert client.get(f"/v1/household-gigs/{gig_id}/dashboard",
+                      headers=stranger).status_code == 403
+
+    # Budget is editable while open, frozen once claimed.
+    assert client.patch(f"/v1/household-gigs/{gig_id}", headers=home,
+                        json={"budget_amount": "50000"}).status_code == 200
+    client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+    assert client.patch(f"/v1/household-gigs/{gig_id}", headers=home,
+                        json={"budget_amount": "1"}).status_code == 409
+
+    # Only the claiming agent can report a cycle.
+    import household
+    cycle_id = household.generate_due_cycles()[0][1]["cycle_id"]
+    assert client.post(f"/v1/household-gigs/{gig_id}/cycles/{cycle_id}/status",
+                       headers=stranger, json={"status": "done"}).status_code == 403
+    assert client.post(f"/v1/household-gigs/{gig_id}/cycles/{cycle_id}/status",
+                       headers=agent, json={"status": "paid"}).status_code == 422
+
+
+def test_household_cancel_stops_the_cycle_clock(client):
+    import household
+    home = _signup(client, "home4@t.dev")
+    agent = _signup(client, "agent4@t.dev")
+    gig_id = _post_gig(client, home).json()["gig_id"]
+    client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+    household.generate_due_cycles()
+
+    cancelled = client.post(f"/v1/household-gigs/{gig_id}/cancel", headers=home).json()
+    assert cancelled["status"] == "cancelled"
+    assert cancelled["next_cycle_date"] == ""
+    assert household.generate_due_cycles() == []
+
+
+def test_one_time_gig_opens_exactly_one_cycle(client):
+    import household
+    home = _signup(client, "home5@t.dev")
+    agent = _signup(client, "agent5@t.dev")
+    gig_id = _post_gig(client, home, cadence="one_time").json()["gig_id"]
+    client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+    assert len(household.generate_due_cycles()) == 1
+    assert household.generate_due_cycles() == []
+
+
+def test_lapsed_gig_does_not_backfill_a_flood_of_cycles(client):
+    """A gig months overdue opens one cycle and catches its date up in one pass."""
+    import datetime
+    import household
+    from db import get_conn
+    home = _signup(client, "home6@t.dev")
+    agent = _signup(client, "agent6@t.dev")
+    gig_id = _post_gig(client, home).json()["gig_id"]
+    client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+    stale = (datetime.date.today() - datetime.timedelta(days=200)).isoformat()
+    conn = get_conn()
+    conn.execute("UPDATE household_gigs SET next_cycle_date=? WHERE gig_id=?", (stale, gig_id))
+    conn.commit()
+    conn.close()
+
+    assert len(household.generate_due_cycles()) == 1
+    assert household.generate_due_cycles() == []   # date is now in the future

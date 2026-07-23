@@ -162,6 +162,92 @@ def send_job_match_alerts(new_listing_ids: list[str]):
             continue  # transient SMTP failure — alerts are best-effort
 
 
+def _email_of(user_id: str) -> str:
+    conn = get_conn()
+    row = conn.execute("SELECT email FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    return row["email"] if row else ""
+
+
+def notify_user(user_id: str, subject: str, body: str) -> bool:
+    """One transactional email to a user by id. Best-effort in the same sense as
+    the digests: a no-op without SMTP creds, and a send failure is swallowed so it
+    can never take down the thing it was reporting on."""
+    if not config.SMTP_ENABLED:
+        return False
+    to_addr = _email_of(user_id)
+    if not to_addr:
+        return False
+    try:
+        _send(to_addr, subject, body)
+        return True
+    except Exception:
+        return False
+
+
+# ── Household Gigs notifications ─────────────────────────────────────────────
+# Every one of these describes work the two parties do between themselves. None
+# of them announce a payment, because ManagerX never makes one.
+
+def notify_gig_claimed(gig: dict) -> bool:
+    """Household: an agent picked up your gig, here's how to pay them."""
+    return notify_user(
+        gig["household_user_id"],
+        f"ManagerX: your household gig “{gig['title']}” was claimed",
+        f"An agent has claimed “{gig['title']}”.\n\n"
+        f"Cadence: {gig['cadence']}\n"
+        f"Your stated budget: {gig['budget_amount']} {gig['budget_currency']} per cycle\n"
+        f"Agent's payment address: {gig['agent_payment_address']}\n\n"
+        "You pay this agent directly. ManagerX does not process, hold, or route "
+        "this payment, and does not verify that the work was done — it lists the "
+        "gig and tracks the status the agent reports.\n\n"
+        f"Your dashboard: {config.PUBLIC_BASE_URL}/household-gigs/{gig['gig_id']}")
+
+
+def notify_cycle_open(gig: dict, cycle: dict) -> bool:
+    """Agent: a new cycle needs your action."""
+    if not gig.get("claimed_by_agent_id"):
+        return False
+    return notify_user(
+        gig["claimed_by_agent_id"],
+        f"ManagerX: cycle {cycle['cycle_index']} open on “{gig['title']}”",
+        f"A new cycle is open on the household gig you claimed.\n\n"
+        f"Gig: {gig['title']}\n"
+        f"Cycle: #{cycle['cycle_index']} ({cycle['cycle_date']})\n"
+        f"Household's budget: {gig['budget_amount']} {gig['budget_currency']}\n\n"
+        "Do the work, settle directly with the household, then mark the cycle "
+        "done or not done so they can see where it stands.\n\n"
+        f"Your claimed gigs: {config.PUBLIC_BASE_URL}/household-gigs")
+
+
+def notify_cycle_reported(gig: dict, cycle: dict) -> bool:
+    """Household: the agent reported on a cycle."""
+    verdict = {"done": "done", "not_done": "NOT done",
+               "skipped": "skipped"}.get(cycle["status"], cycle["status"])
+    note = f"\n\nAgent's note: {cycle['agent_note']}" if cycle.get("agent_note") else ""
+    return notify_user(
+        gig["household_user_id"],
+        f"ManagerX: cycle {cycle['cycle_index']} on “{gig['title']}” marked {verdict}",
+        f"The agent handling “{gig['title']}” marked cycle "
+        f"#{cycle['cycle_index']} ({cycle['cycle_date']}) as {verdict}.{note}\n\n"
+        "This status is self-reported by the agent. ManagerX does not verify it — "
+        "check with your provider before treating it as settled, then acknowledge "
+        "the cycle on your dashboard.\n\n"
+        f"Your dashboard: {config.PUBLIC_BASE_URL}/household-gigs/{gig['gig_id']}")
+
+
+def notify_gig_cancelled(gig: dict) -> bool:
+    """Agent: the household ended the gig."""
+    if not gig.get("claimed_by_agent_id"):
+        return False
+    return notify_user(
+        gig["claimed_by_agent_id"],
+        f"ManagerX: household gig “{gig['title']}” was cancelled",
+        f"The household has cancelled “{gig['title']}”. No further cycles will "
+        "open on it.\n\nAnything already settled between you stays between you — "
+        "ManagerX held no funds for this gig and has nothing to refund or reverse.")
+
+
 def send_deadline_reminders():
     """Email users whose vault documents have obligations coming due (probation
     ends, offer expiries, contract ends). Rides the scanner tick; a no-op

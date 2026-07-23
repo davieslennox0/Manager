@@ -22,6 +22,7 @@ from routes.agreement_routes import router as agreement_router
 from routes.auth_routes import router as auth_router
 from routes.benchmark_routes import router as benchmark_router
 from routes.document_routes import router as document_router
+from routes.household_routes import router as household_router
 from routes.job_routes import router as job_router
 from routes.listing_routes import router as listing_router
 from routes.profile_routes import router as profile_router
@@ -45,6 +46,9 @@ async def lifespan(app: FastAPI):
     if config.BALANCE_REPORT_ENABLED:
         import balance_report
         tasks.append(asyncio.create_task(balance_report.balance_report_loop()))
+    if config.HOUSEHOLD_ENABLED:
+        import household
+        tasks.append(asyncio.create_task(household.household_loop()))
     yield
     for task in tasks:
         task.cancel()
@@ -83,7 +87,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
 
 for r in (auth_router, profile_router, job_router, agreement_router, document_router,
           listing_router, proof_router, public_router, benchmark_router,
-          agentic_router, agent_jobs_router, base_x402_router):
+          agentic_router, agent_jobs_router, base_x402_router, household_router):
     app.include_router(r)
 
 
@@ -95,6 +99,7 @@ async def health():
             "scanner": config.SCANNER_ENABLED,
             "smtp": config.SMTP_ENABLED,
             "funding": config.FUNDING_ENABLED,
+            "household_gigs": config.HOUSEHOLD_ENABLED,
             "github_oauth": config.GITHUB_OAUTH_ENABLED,
             "x402": config.X402_ENABLED,
             "x402_cdp": config.X402_CDP_ENABLED,

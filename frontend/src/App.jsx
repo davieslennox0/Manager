@@ -5,6 +5,8 @@ import AgentJobs from "./pages/AgentJobs.jsx";
 import Agreements from "./pages/Agreements.jsx";
 import Board from "./pages/Board.jsx";
 import Documents from "./pages/Documents.jsx";
+import HouseholdGigDetail from "./pages/HouseholdGigDetail.jsx";
+import HouseholdGigs from "./pages/HouseholdGigs.jsx";
 import JobDetail from "./pages/JobDetail.jsx";
 import Jobs from "./pages/Jobs.jsx";
 import Landing from "./pages/Landing.jsx";
@@ -42,13 +44,13 @@ function Nav() {
         <div className="hidden sm:flex items-center gap-4">
           <Link to="/board" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Job board</Link>
           <Link to="/agent-jobs" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Agent&nbsp;Jobs</Link>
+          <Link to="/household-gigs" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Household&nbsp;Gigs</Link>
         </div>
         {!authed && (
           <div className="hidden lg:flex items-center gap-4">
             <a href="/#features" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Features</a>
             <a href="/#review" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Contract review</a>
             <a href="/#agents" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">For agents</a>
-            <a href="/#household" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">Household&nbsp;Gigs</a>
             <a href="/#how" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">How it works</a>
           </div>
         )}
@@ -87,6 +89,9 @@ export default function App() {
   if (path === "/login" || path === "/signup") page = <Login mode={path.slice(1)} />;
   else if (path === "/board") page = <Board />;
   else if (path === "/agent-jobs") page = <AgentJobs />;
+  else if (path === "/household-gigs") page = <HouseholdGigs />;
+  else if (path.startsWith("/household-gigs/"))
+    page = <HouseholdGigDetail gigId={path.split("/")[2]} />;
   else if (path === "/jobs") page = <Jobs />;
   else if (path.startsWith("/job/")) page = <JobDetail jobId={path.split("/")[2]} />;
   else if (path === "/documents") page = <Documents />;
@@ -109,7 +114,7 @@ export default function App() {
           <a href="/#features" className="hover:text-black dark:hover:text-white">Features</a>
           <a href="/#review" className="hover:text-black dark:hover:text-white">Contract review</a>
           <a href="/#agents" className="hover:text-black dark:hover:text-white">For agents</a>
-          <a href="/#household" className="hover:text-black dark:hover:text-white">Household Gigs</a>
+          <Link to="/household-gigs" className="hover:text-black dark:hover:text-white">Household Gigs</Link>
           <a href="/#how" className="hover:text-black dark:hover:text-white">How it works</a>
           <span className="ml-auto">
             Documents anchor onchain via SignatureRegistry · X Layer (196)

@@ -89,6 +89,13 @@ FUNDING_FRESH_DAYS = int(os.getenv("FUNDING_FRESH_DAYS", "90"))
 
 # GitHub OAuth for the proof-of-work CV layer. Unset -> the OAuth button hides
 # and users connect in public-data mode (public repos only, no token stored).
+# Household Gigs: the cycle-generation loop opens a new (pending) cycle on each
+# active gig when its next_cycle_date arrives. Dates are day-granular, so a tick
+# an hour apart is plenty — the unique (gig_id, cycle_index) index makes an extra
+# tick a no-op rather than a duplicate.
+HOUSEHOLD_ENABLED = os.getenv("HOUSEHOLD_ENABLED", "1") == "1"
+HOUSEHOLD_TICK_SECONDS = int(os.getenv("HOUSEHOLD_TICK_SECONDS", "3600"))
+
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 GITHUB_OAUTH_ENABLED = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET)
