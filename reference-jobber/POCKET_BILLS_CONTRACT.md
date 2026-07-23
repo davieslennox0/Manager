@@ -48,10 +48,26 @@ gig outside them.
 We paid for three catalog calls and one real purchase (0.247082 USDT total) and
 read the answers off the wire rather than waiting for a spec.
 
-**The checkout leg** — `POST https://bills.hashpaylink.com/v1/okx/bills`, also
-x402 but **Permit2**, not EIP-3009. Permit2 requires a one-time
-`approve(0x000000000022D473030F116dDEE9F6B43aC78BA3, …)` on the USDT token before
-any payment can settle; we approved a bounded 1 USDT rather than MAX.
+**The checkout leg** — `POST https://bills.hashpaylink.com/v1/okx/bills`, x402.
+
+> **Updated 2026-07-23 — Pocket Bills shipped fixes; verified from our side.**
+> The checkout leg was Permit2, which needed a one-time
+> `approve(0x000000000022D473030F116dDEE9F6B43aC78BA3, …)`. **That is gone.** It
+> is now `exact` / EIP-3009, one shot — an MTN purchase settled in a single
+> signed POST with no approve step (tx `0x9c241eb6…`, 0.145289 USDT). Two other
+> changes confirmed: **duplicate-charge protection** keys on `externalOrderId`,
+> and **failed purchases auto-refund** — the two stranded settlements walked from
+> `provider_failed_unverified` / `needs_review` to `refunding` after a requery
+> job ran (`requeryAttempts` 0 → 1). The rail now recovers on its own.
+>
+> Two gotchas found while verifying:
+> - **Do not prefix `externalOrderId` with `okx:`** — Pocket Bills prepends it,
+>   and sending our own produced a doubled `okx:okx:…`.
+> - **Live provider vending is currently DISABLED upstream.** A paid MTN call
+>   returned `needs_review` / "Live provider vending is disabled." So payment,
+>   idempotency and refunds all work, but nothing is actually delivered right
+>   now — every purchase refunds. Nothing can go to a real household until they
+>   re-enable vending.
 
 ```json
 { "externalOrderId": "stable buyer order id — reuse only when retrying the same bill",
@@ -120,54 +136,51 @@ Settlement status is pollable at
 `/v1/okx/settlements/{id}?token=…` — the token is a **query parameter**, not a
 Bearer header; sending it as Bearer returns `STATUS_TOKEN_INVALID`.
 
-## The gap
+## The gap — now closed
 
-Their listing says the service "prepares a machine-readable checkout handoff".
-That is discovery — provider options and plans. **The handoff itself is described
-inside the paid response, and we have never seen a paid response.** So we know
-how to ask what an electricity plan costs; we do not yet know the call that vends
-a token against a specific meter number.
+The handoff is no longer a mystery. We've made four paid checkouts and read the
+full schema off the wire (see the checkout body above). `checkout()` in
+`fulfilment.py` implements it and is proven end to end. What blocks a real
+household is no longer *how* to call it — it's two things:
 
-One successful paid call reveals it. `payment quote` currently reports
-`hasBalance: false` — the wallet holds no USDT on X Layer, so the call cannot go
-through until it's funded. 0.01 USDT settles this.
+1. **Live vending is off.** Until Pocket Bills re-enables it, every purchase
+   refunds and nothing is delivered. Nothing to do here but wait for them.
+2. **Gig text → structured plan.** A ManagerX gig carries freeform
+   `service_details`; checkout needs a `(serviceId, variationCode)`. Mapping the
+   two is an unmade product decision (structured posting fields per bill type, or
+   resolve-the-catalog-and-confirm on first cycle). `pay()` refuses in the loop
+   until this lands; call `checkout()` directly for a structured test.
 
-Until then `PocketBillsAdapter.pay()` deliberately refuses instead of guessing.
+## Answered questions (were "worth asking anyway")
 
-## Questions worth asking them anyway
+**Idempotency key on checkout?** Yes — `externalOrderId`. Confirmed live: send it
+**bare**, Pocket Bills prepends its own `okx:` namespace (we saw a doubled
+`okx:okx:` when we prefixed it ourselves). This is the two-call crash gap closed:
+the ManagerX `cycle_id` becomes the key.
 
-**1. Does the checkout leg cost separately, and how is the bill amount itself
-paid?** The 0.01 USDT is the catalog fee. Vending ₦25,000 of electricity is a
-different quantum of money, and we need to know whether that rides the same x402
-rail, a prefunded balance, or something else.
+**Rejection vs outage?** Now deterministic. A failed provider call lands in
+`needs_review` or `provider_failed_unverified`, and a requery job walks it to a
+definite `refunding`/`refunded`. `classify_settlement()` maps delivered→ok,
+refund states→failed (retryable), review states→unknown (park and re-poll).
 
-**2. Do you honour an idempotency key on the checkout leg?** This is the one that
-changes our architecture. The jobber pays a bill and then reports it to ManagerX
-— two calls. If it dies in between, we don't know whether the money moved. Today
-it parks the cycle for a human, which is safe and slow. If you dedupe on a key we
-supply — we'd send the ManagerX `cycle_id`, unique per bill per period and stable
-across retries — that failure mode disappears.
+**What we show the household** — `deliveryCode` / `receiptHash`. Empty until
+vending is re-enabled.
 
-**3. Can we distinguish a rejection from an outage?** We need a definite "no money
-moved" that isn't a 500 or a timeout. Confirm you never return 4xx after taking
-money.
-
-**4. What comes back that we can show the household?** For prepaid electricity
-that should be the actual token. Name the field.
-
-**5. Is there a sandbox?** We'd rather find our mistakes without vending real
-tokens to real meters.
+**Sandbox?** In effect, yes right now: with live vending disabled the rail takes
+payment, exercises the full path, and refunds — a free integration test bed,
+though not one they've named as such.
 
 ## What they need from us
 
 Nothing. No ManagerX key, no polling. They were right about that — the jobber
 owns the ManagerX workflow and calls them as a plain paid HTTP service.
 
-## Test plan once the checkout leg is known
+## Test plan, once vending is re-enabled and the mapping decision is made
 
-1. `jobber.py catalog electricity` against a funded wallet — read the handoff.
-2. Implement `pay()` against it; point `FULFILMENT=pocketbills` at a sandbox.
+1. `jobber.py catalog electricity` against the funded wallet — read the plans.
+2. Point `FULFILMENT=pocketbills` at a gig with a known serviceId/variationCode.
 3. Post a gig, let the agent claim it, force a cycle, confirm the token arrives
    by SMS and the reference lands in the report the household sees.
-4. Kill the agent mid-payment and restart it. Nothing should be paid twice.
+4. Kill the agent mid-payment and restart it. Nothing should be paid twice —
+   this already passes against the mock, and `externalOrderId` now backs it live.
    This is the test that matters, and it already passes against the mock.
