@@ -24,6 +24,7 @@ router = APIRouter(prefix="/v1/household-gigs", tags=["household-gigs"])
 
 MAX_ADDRESS_LEN = 200
 MAX_NOTE_LEN = 2000
+MAX_DETAILS_LEN = 4000
 
 
 class GigCreate(BaseModel):
@@ -32,6 +33,7 @@ class GigCreate(BaseModel):
     cadence: str = "monthly"
     budget_amount: str = ""
     budget_currency: str = ""
+    service_details: str = ""    # meter no., phone for the token, account ref — private
     first_cycle_date: str = ""   # ISO date; defaults to today (starts once claimed)
 
 
@@ -39,6 +41,7 @@ class GigPatch(BaseModel):
     title: str | None = None
     budget_amount: str | None = None
     budget_currency: str | None = None
+    service_details: str | None = None   # operational, not a term: editable at any time
     status: str | None = None    # active <-> paused only
 
 
@@ -106,9 +109,15 @@ def _claimed_by(conn, gig_id: str, user_id: str):
 
 
 def _public(row) -> dict:
-    """Board shape: the household's identity never leaves the dashboard."""
+    """Board shape: the household's identity never leaves the dashboard, and
+    neither does service_details — that field holds a meter number, the phone the
+    prepaid token is sent to, an account or smartcard reference. Publishing it
+    would hand anyone browsing the board enough to impersonate the household to
+    its own utility. Browsing agents get only whether it has been filled in."""
     d = household.shape_gig(row)
-    for private in ("household_user_id", "claimed_by_agent_id", "agent_payment_address"):
+    d["has_service_details"] = bool((row["service_details"] or "").strip())
+    for private in ("household_user_id", "claimed_by_agent_id",
+                    "agent_payment_address", "service_details"):
         d.pop(private, None)
     return d
 
@@ -132,10 +141,11 @@ async def create_gig(body: GigCreate, user: dict = Depends(current_actor)):
     conn = get_conn()
     conn.execute(
         """INSERT INTO household_gigs (gig_id, household_user_id, title, bill_types,
-           cadence, budget_amount, budget_currency, next_cycle_date)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+           cadence, budget_amount, budget_currency, service_details, next_cycle_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (gig_id, user["user_id"], title, bill_types, body.cadence, amount,
-         body.budget_currency.strip()[:24], start.isoformat()))
+         body.budget_currency.strip()[:24],
+         body.service_details.strip()[:MAX_DETAILS_LEN], start.isoformat()))
     conn.commit()
     row = conn.execute("SELECT * FROM household_gigs WHERE gig_id = ?", (gig_id,)).fetchone()
     conn.close()
@@ -223,7 +233,12 @@ async def claimed_gigs(user: dict = Depends(current_actor)):
         gig["pending_cycles"] = [c for c in gig["cycles"] if c["status"] == "pending"]
         out.append(gig)
     conn.close()
-    return {"total": len(out), "household_gigs": out}
+    return {"total": len(out), "household_gigs": out,
+            "note": "service_details is the household's own account data — meter "
+                    "number, the phone its prepaid token is sent to, account or "
+                    "smartcard reference. It is released to you because you claimed "
+                    "the gig. Use it for this work and nothing else; don't log, "
+                    "forward, or republish it."}
 
 
 # ── the gig ──────────────────────────────────────────────────────────────────
@@ -233,7 +248,9 @@ async def patch_gig(gig_id: str, body: GigPatch, user: dict = Depends(current_ac
     """Household edits. Budget and title are editable only while the gig is still
     `open` — once an agent has claimed on those terms, changing them would be a
     renegotiation, and there is deliberately no renegotiation flow: cancel and
-    repost instead. Status may be toggled active <-> paused at any time."""
+    repost instead. service_details and status are not terms and stay editable:
+    a mistyped meter number has to be fixable mid-gig, or every cycle after it
+    fails."""
     conn = get_conn()
     row = _owned(conn, gig_id, user["user_id"])
     sets, args = [], []
@@ -257,6 +274,11 @@ async def patch_gig(gig_id: str, body: GigPatch, user: dict = Depends(current_ac
     if body.budget_currency is not None:
         sets.append("budget_currency = ?")
         args.append(body.budget_currency.strip()[:24])
+    if body.service_details is not None:
+        # Not frozen on claim: a meter number gets mistyped and a phone number
+        # changes, and the agent needs the corrected one to do the next cycle.
+        sets.append("service_details = ?")
+        args.append(body.service_details.strip()[:MAX_DETAILS_LEN])
 
     if body.status is not None:
         if body.status not in ("active", "paused"):

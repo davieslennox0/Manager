@@ -264,6 +264,11 @@ CREATE TABLE IF NOT EXISTS household_gigs (
     budget_amount TEXT NOT NULL DEFAULT '',    -- numeric-as-text (same convention as
                                                -- agent_jobs.reward); display only
     budget_currency TEXT NOT NULL DEFAULT '',  -- NGN | USDC | … household's own label
+    service_details TEXT NOT NULL DEFAULT '',  -- what the agent needs to actually do the
+                                               -- job: meter number, the phone the token
+                                               -- goes to, account/smartcard ref, provider.
+                                               -- Household PII: never on the public board,
+                                               -- released only to the claiming agent.
     claimed_by_agent_id TEXT REFERENCES users(user_id),
     agent_payment_address TEXT NOT NULL DEFAULT '',  -- set by the agent at claim; display only
     claimed_at   TIMESTAMP,
@@ -322,6 +327,10 @@ def init_db():
     if jcols and "cover_letter" not in jcols:
         conn.execute("ALTER TABLE jobs ADD COLUMN cover_letter TEXT NOT NULL DEFAULT ''")
         conn.execute("ALTER TABLE jobs ADD COLUMN applied_at TIMESTAMP")
+    hcols = [r["name"] for r in conn.execute("PRAGMA table_info(household_gigs)").fetchall()]
+    if hcols and "service_details" not in hcols:
+        conn.execute("ALTER TABLE household_gigs ADD COLUMN "
+                     "service_details TEXT NOT NULL DEFAULT ''")
     conn.executescript(_SCHEMA)
     conn.commit()
     conn.close()

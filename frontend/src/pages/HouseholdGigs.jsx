@@ -8,6 +8,27 @@ const CADENCES = ["monthly", "weekly", "one_time"];
 
 const label = (s) => (s || "").replace(/_/g, " ");
 
+// What an agent actually needs to do each bill type. Shown as a prompt while the
+// household fills the details box, because "tell us what the agent needs" on its
+// own gets you a blank field and a stuck agent on cycle one.
+const DETAIL_HINTS = {
+  electricity: "meter number, the phone number the token should be sent to, and your DisCo",
+  gas: "account or customer number and the supplier",
+  water: "account or customer number and the water board",
+  broadband: "account number, the name on the account, and the plan",
+  tv_subscription: "smartcard / decoder number, the name on the account, and the package",
+  streaming: "the account email and which plan to keep it on",
+  mobile: "the phone number to top up and the network",
+  waste: "account or customer number and the collection provider",
+  other: "whatever the provider will ask for to identify your account",
+};
+
+function detailPrompt(types) {
+  const hints = types.map((t) => DETAIL_HINTS[t]).filter(Boolean);
+  if (hints.length === 0) return "Pick a bill type above and we'll tell you what to include.";
+  return "Include " + hints.join("; then ") + ".";
+}
+
 // The one thing every view of this feature has to say out loud: ManagerX lists
 // the work and tracks what the agent claims — it is not in the money path.
 function SettlementNote({ className = "" }) {
@@ -119,6 +140,11 @@ function Board({ authed, onClaimed }) {
               ))}
             </div>
             <div className="mt-3 text-sm"><Money gig={gig} /></div>
+            <p className="text-xs text-neutral-500 mt-1">
+              {gig.has_service_details
+                ? "Account details ready — released to you when you claim."
+                : "No account details yet — you'd need to ask the household for them."}
+            </p>
 
             {claiming === gig.gig_id ? (
               <div className="mt-3 flex gap-2 flex-wrap">
@@ -153,8 +179,8 @@ function Board({ authed, onClaimed }) {
 
 // ── Post a gig ──────────────────────────────────────────────────────────────
 function PostGig({ onPosted }) {
-  const [form, setForm] = useState({ title: "", cadence: "monthly",
-                                     budget_amount: "", budget_currency: "NGN" });
+  const [form, setForm] = useState({ title: "", cadence: "monthly", budget_amount: "",
+                                     budget_currency: "NGN", service_details: "" });
   const [types, setTypes] = useState([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -168,7 +194,8 @@ function PostGig({ onPosted }) {
     setBusy(true);
     try {
       await api("POST", "/v1/household-gigs", { ...form, bill_types: types });
-      setForm({ title: "", cadence: "monthly", budget_amount: "", budget_currency: "NGN" });
+      setForm({ title: "", cadence: "monthly", budget_amount: "",
+                budget_currency: "NGN", service_details: "" });
       setTypes([]);
       setErr("");
       onPosted?.();
@@ -217,6 +244,20 @@ function PostGig({ onPosted }) {
             <input className="input" value={form.budget_currency} placeholder="NGN"
                    onChange={(e) => setForm({ ...form, budget_currency: e.target.value })} />
           </div>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">What the agent needs to work with</label>
+          <textarea className="input min-h-[110px] resize-y" value={form.service_details}
+                    placeholder={"Meter number: 04123456789\n"
+                                 + "Send token to: 0803 000 0000\n"
+                                 + "DisCo: Ikeja Electric"}
+                    onChange={(e) => setForm({ ...form, service_details: e.target.value })} />
+          <p className="text-xs text-neutral-500 mt-1.5">{detailPrompt(types)}</p>
+          <p className="text-xs text-neutral-500 mt-1">
+            <b className="text-black dark:text-white">Kept private.</b> This is never
+            shown on the public board — only the agent who claims the gig can see it.
+            You can correct it at any time, including after a claim.
+          </p>
         </div>
       </div>
       {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
@@ -320,6 +361,19 @@ function MyClaimed({ refreshKey }) {
                 </div>
               </div>
             </div>
+
+            {gig.service_details && (
+              <div className="card-inner mt-4">
+                <p className="text-xs uppercase tracking-wide text-neutral-500 mb-1">
+                  What you're working with — from the household
+                </p>
+                <pre className="text-sm whitespace-pre-wrap font-sans">{gig.service_details}</pre>
+                <p className="text-xs text-neutral-500 mt-2">
+                  Their own account data. Use it for this gig and nothing else — don't
+                  forward or republish it.
+                </p>
+              </div>
+            )}
 
             <div className="mt-4 space-y-2">
               {gig.cycles.map((c) => (

@@ -633,3 +633,49 @@ def test_agent_key_cannot_reach_another_users_gig(client):
     gig_id = _post_gig(client, home).json()["gig_id"]
     assert client.get(f"/v1/household-gigs/{gig_id}/dashboard",
                       headers={"X-API-Key": key}).status_code == 403
+
+
+# ── service_details: household PII, released only on claim ───────────────────
+
+def test_service_details_never_reach_the_public_board(client):
+    home = _signup(client, "home9@t.dev")
+    agent = _signup(client, "agent9@t.dev")
+    secret = "Meter 04123456789\nToken to 0803 000 0000\nIkeja Electric"
+    gig_id = _post_gig(client, home, service_details=secret).json()["gig_id"]
+
+    # Select by id: other tests leave open gigs on the board and created_at ties
+    # at second granularity, so position is not stable.
+    board = client.get("/v1/household-gigs").json()["household_gigs"]
+    mine = next(g for g in board if g["gig_id"] == gig_id)
+    assert "service_details" not in mine
+    assert mine["has_service_details"] is True
+    assert "04123456789" not in json.dumps(board)   # not in ANY row on the board
+
+    # Released to the agent only once they've claimed it.
+    client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+    claimed = client.get("/v1/household-gigs/claimed", headers=agent).json()
+    assert claimed["household_gigs"][0]["service_details"] == secret
+
+    # ...and never to anyone else.
+    stranger = _signup(client, "stranger9@t.dev")
+    assert client.get("/v1/household-gigs/claimed",
+                      headers=stranger).json()["household_gigs"] == []
+
+
+def test_service_details_stay_editable_after_claim(client):
+    """Unlike the commercial terms: a mistyped meter number has to be fixable, or
+    every cycle after it fails."""
+    home = _signup(client, "home10@t.dev")
+    agent = _signup(client, "agent10@t.dev")
+    gig_id = _post_gig(client, home, service_details="Meter 0000 (wrong)").json()["gig_id"]
+    client.post(f"/v1/household-gigs/{gig_id}/claim", headers=agent,
+                json={"agent_payment_address": "0xA"})
+
+    assert client.patch(f"/v1/household-gigs/{gig_id}", headers=home,
+                        json={"budget_amount": "1"}).status_code == 409   # terms frozen
+    fixed = client.patch(f"/v1/household-gigs/{gig_id}", headers=home,
+                         json={"service_details": "Meter 04123456789"})
+    assert fixed.status_code == 200
+    assert client.get("/v1/household-gigs/claimed", headers=agent).json()[
+        "household_gigs"][0]["service_details"] == "Meter 04123456789"

@@ -7,10 +7,14 @@ export default function HouseholdGigDetail({ gigId }) {
   const [gig, setGig] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [details, setDetails] = useState("");
 
   async function load() {
     try {
-      setGig(await api("GET", `/v1/household-gigs/${gigId}/dashboard`));
+      const next = await api("GET", `/v1/household-gigs/${gigId}/dashboard`);
+      setGig(next);
+      setDetails(next.service_details || "");
       setErr("");
     } catch (error) { setErr(error.message); }
   }
@@ -117,6 +121,59 @@ export default function HouseholdGigDetail({ gigId }) {
             </p>
           )}
         </div>
+      </div>
+
+      <div className="panel mt-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-medium">What the agent works with</h2>
+            <p className="text-xs text-neutral-500 mt-1">
+              Meter number, the phone your token goes to, account references. Private
+              to you and the agent who claimed this gig — never on the public board.
+            </p>
+          </div>
+          {!editing && (
+            <button className="btn-ghost !py-1 !text-xs" onClick={() => setEditing(true)}>
+              {gig.service_details ? "Edit" : "Add details"}
+            </button>
+          )}
+        </div>
+
+        {editing ? (
+          <div className="mt-3">
+            <textarea className="input min-h-[120px] resize-y" value={details}
+                      placeholder={"Meter number: 04123456789\n"
+                                   + "Send token to: 0803 000 0000\n"
+                                   + "DisCo: Ikeja Electric"}
+                      onChange={(e) => setDetails(e.target.value)} />
+            <div className="flex gap-2 mt-2">
+              <button className="btn !py-1.5" disabled={busy}
+                      onClick={() => act(async () => {
+                        await api("PATCH", `/v1/household-gigs/${gigId}`,
+                                  { service_details: details });
+                        setEditing(false);
+                      })}>
+                Save
+              </button>
+              <button className="btn-ghost !py-1.5" disabled={busy}
+                      onClick={() => { setDetails(gig.service_details || ""); setEditing(false); }}>
+                Cancel
+              </button>
+            </div>
+            <p className="text-xs text-neutral-500 mt-2">
+              Editable at any time, including after a claim — a mistyped meter number
+              has to be fixable, or every cycle after it fails.
+            </p>
+          </div>
+        ) : gig.service_details ? (
+          <pre className="card-inner mt-3 text-sm whitespace-pre-wrap font-sans">
+            {gig.service_details}
+          </pre>
+        ) : (
+          <p className="text-sm text-neutral-500 mt-3">
+            Nothing added yet — without this an agent can't act on the first cycle.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-4 flex-wrap mt-8">
