@@ -1,0 +1,68 @@
+Message to Pocket Bills — vending enabled, provider still failing, 2026-07-23
+Copy from the line below.
+
+--------------------------------------------------------------------------
+
+Hi — thanks for the fixes. From our side we've confirmed all three: checkout is
+now EIP-3009 and settles in one signed call (Permit2 and the approve step are
+gone), the externalOrderId idempotency key works, and failed purchases move into
+your refund flow. That part of the rail is solid.
+
+The remaining problem is upstream of you. With live vending now enabled, the call
+reaches your data provider — and the provider rejects every one of them. We are
+now four-for-four on failures, all small data top-ups:
+
+  1) Airtel Data, 200 Naira            settlement pst_2628bcc40634420c8b0acc16dcd634e0
+     paid   0.217082 USDT (X Layer)    state     refunding
+     provider ref 17848183643998127256192920
+     provider says  "TRANSACTION FAILED"
+
+  2) Airtel Data, 100 Naira            settlement pst_abbee67871f8446195a56da3303411b7
+     paid   0.144447 USDT (X Layer)    state     refunding
+     provider ref 17848196792223925078120263
+     provider says  "TRANSACTION FAILED"
+
+  3) MTN Data, 100 Naira               settlement pst_b718729507294bd58225c4fcc5ba7058
+     paid   0.145289 USDT (X Layer)    state     needs_review
+     provider ref (none)
+     provider says  "Live provider vending is disabled."   <- before you enabled it
+
+  4) MTN Data, 100 Naira               settlement pst_b5302422120e4c588618d51bdb04d5c1
+     paid   0.145244 USDT (X Layer)    state     provider_failed_unverified
+     provider ref 17848343535419802284720202
+     provider says  "TRANSACTION FAILED"
+
+The change is telling. Before you enabled vending, #3 came back "Live provider
+vending is disabled" and never reached the provider. After you enabled it, #4
+reached the provider and got a real reference back — and the provider still
+returned "TRANSACTION FAILED", with no delivery code and no receipt hash. So the
+payment rail is doing its job; the failure is now entirely on the upstream vend.
+
+This reads to us like the data provider account behind your rail isn't funded or
+provisioned for live vending, or these small denominations aren't vendable. Two
+things would settle it:
+
+1. Can you confirm a single successful vend from your own end — any plan, any
+   provider — with a delivery code? One green transaction tells us the upstream
+   is live and lets us move forward. Right now we have no evidence it can deliver.
+
+2. Is there anything specific to these small data bundles (100-200 Naira) that
+   makes them fail? If larger plans or a different category (e.g. electricity)
+   vend cleanly, tell us and we'll test against those instead.
+
+Refunds — where to send them.
+
+All four were paid from, and should refund to, our wallet on X Layer:
+
+  Address   0xa06ec7302917c4bd51c521330ec970629b4e047f
+  Network   X Layer  (eip155:196, chain 196)
+  Asset     USDT / USD₮0  0x779ded0c9e1022225f8e0630b35a9b54be713736
+
+Total outstanding across the four is 0.652062 USDT. Two are already "refunding"
+on your side but nothing has credited back to the wallet yet, and the other two
+haven't entered the refund flow. Please confirm these are on their way to the
+address above, or let us know if you need anything from us to release them.
+
+We're keen to keep going the moment you can show one successful vend.
+
+--------------------------------------------------------------------------
