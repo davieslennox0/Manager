@@ -43,6 +43,60 @@ Request body, schema-locked with `additionalProperties: false`:
 what our agent can honestly claim — the jobber's policy now refuses to claim any
 gig outside them.
 
+## Answered by a live paid run, 2026-07-23
+
+We paid for three catalog calls and one real purchase (0.247082 USDT total) and
+read the answers off the wire rather than waiting for a spec.
+
+**The checkout leg** — `POST https://bills.hashpaylink.com/v1/okx/bills`, also
+x402 but **Permit2**, not EIP-3009. Permit2 requires a one-time
+`approve(0x000000000022D473030F116dDEE9F6B43aC78BA3, …)` on the USDT token before
+any payment can settle; we approved a bounded 1 USDT rather than MAX.
+
+```json
+{ "externalOrderId": "stable buyer order id — reuse only when retrying the same bill",
+  "category": "data|electricity|tv",
+  "serviceId": "from the catalog, e.g. airtel-data",
+  "variationCode": "the plan/bouquet/meter type, e.g. airt-200",
+  "customerReference": "phone / smartcard / meter number",
+  "contactPhone": "required for electricity and tv",
+  "amountNgn": "required for electricity" }
+```
+
+**Question 2 is answered, and it's the good answer.** `externalOrderId` is
+exactly the idempotency key we asked for — "reuse the same value only when
+retrying the same bill". The ManagerX `cycle_id` drops straight in, which means
+the agent's `attempting` state can eventually become retryable rather than
+parked. Worth confirming with them how long they hold the key.
+
+**The economics are the surprise, and they change the product.** A ₦200 Airtel
+bundle:
+
+| | |
+|---|---|
+| provider amount | ₦199.03 |
+| **Pocket Bills fee** | **₦100.00** |
+| total | ₦299.03 |
+| settled | 0.217082 USDT @ ₦1377.5/USDT |
+
+A flat ₦100 per transaction is 50% on a ₦200 bundle. It is noise on a ₦25,000
+electricity bill. **This agent should not touch small top-ups** — `MIN_BUDGET`
+has to sit far above ₦100 or every cycle loses money, and electricity is the
+right anchor for exactly this reason.
+
+**The purchase failed at the provider.** Payment settled on-chain
+(`0xa49e5e01…`, 0.217082 USDT taken) and the settlement came back
+`provider_failed_unverified` / "TRANSACTION FAILED", with no delivery code, no
+requery attempted, and no refund observed. So on the very first real transaction
+we hit the exact case the agent's ledger was built for: money gone, service not
+delivered. **Ask them what happens to that money** — automatic requery, refund,
+or manual claim — because it decides whether `provider_failed_unverified` maps
+to our `failed` (safe to retry) or `attempting` (park for a human).
+
+Settlement status is pollable at
+`/v1/okx/settlements/{id}?token=…` — the token is a **query parameter**, not a
+Bearer header; sending it as Bearer returns `STATUS_TOKEN_INVALID`.
+
 ## The gap
 
 Their listing says the service "prepares a machine-readable checkout handoff".

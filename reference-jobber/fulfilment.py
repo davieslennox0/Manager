@@ -132,13 +132,20 @@ class PocketBillsAdapter(Adapter):
 
         data = quote.get("data") or {}
         payment_id = data.get("paymentId") or ""
-        payable = [c for c in data.get("candidates") or [] if c.get("hasBalance")]
-        if not payable:
-            want = (data.get("candidates") or [{}])[0]
-            return Result.failed(
-                f"Wallet cannot cover this call: needs "
-                f"{want.get('amountHuman', '0.01')} {want.get('tokenSymbol', 'USDT')} "
-                f"on {want.get('chainName', 'X Layer')}. Fund it, then retry.")
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return Result.failed("Pocket Bills offered no payable scheme.")
+        # hasBalance is advisory, not a gate. Observed in the wild: a wallet
+        # holding 0.70 of the exact asset reported hasBalance=false because the
+        # preflight matches on symbol ("USDT") and the wallet reports the token's
+        # own name ("USD₮0"). Refusing on it would have blocked a funded wallet,
+        # so warn and let the signer be the authority on whether funds exist.
+        payable = [c for c in candidates if c.get("hasBalance")] or candidates
+        if not any(c.get("hasBalance") for c in candidates):
+            want = candidates[0]
+            print(f"  ! balance preflight says no {want.get('tokenSymbol')} on "
+                  f"{want.get('chainName')} — attempting anyway, the symbol check "
+                  f"gives false negatives")
 
         # payment pay signs; a non-answer from here on is genuinely unknown.
         index = payable[0].get("acceptsIndex", 0)

@@ -184,6 +184,21 @@ function PostGig({ onPosted }) {
   const [types, setTypes] = useState([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // The rate comes from the server rather than a constant in here, so the quote
+  // the household sees can never drift from the one the API applies.
+  const [feeRate, setFeeRate] = useState(null);
+
+  useEffect(() => {
+    api("GET", "/v1/household-gigs")
+      .then((r) => setFeeRate(parseFloat(r.platform_fee_rate)))
+      .catch(() => {});
+  }, []);
+
+  const bill = parseFloat(String(form.budget_amount).replace(/,/g, ""));
+  const money = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2 });
+  const quote = feeRate && bill > 0
+    ? { fee: bill * feeRate, total: bill * (1 + feeRate) } : null;
 
   function toggle(bt) {
     setTypes((t) => (t.includes(bt) ? t.filter((x) => x !== bt) : [...t, bt]));
@@ -245,6 +260,35 @@ function PostGig({ onPosted }) {
                    onChange={(e) => setForm({ ...form, budget_currency: e.target.value })} />
           </div>
         </div>
+        {/* Quoted while they type, not after they commit. The fee sits on top of
+            the bill budget rather than inside it — a bill paid 0.1% short is a
+            bill the provider rejects, and the household is the one left cut off. */}
+        {quote && (
+          <div className="sm:col-span-2 rounded-xl border border-wos-border
+                          dark:border-wos-dborder p-3 text-sm">
+            <div className="flex justify-between py-0.5">
+              <span className="text-neutral-500">Bill budget — goes to the agent, in full</span>
+              <span>{money(bill)} {form.budget_currency}</span>
+            </div>
+            <div className="flex justify-between py-0.5">
+              <span className="text-neutral-500">
+                ManagerX fee ({(feeRate * 100).toFixed(1)}%)
+              </span>
+              <span>{money(quote.fee)} {form.budget_currency}</span>
+            </div>
+            <div className="flex justify-between py-1 mt-1 border-t border-wos-border
+                            dark:border-wos-dborder font-medium">
+              <span>You budget per cycle</span>
+              <span>{money(quote.total)} {form.budget_currency}</span>
+            </div>
+            <p className="text-xs text-neutral-500 mt-2 leading-relaxed">
+              The fee is added on top so the agent always receives the full bill
+              amount — a bill paid short gets rejected and leaves you disconnected.
+              Both figures are listed information: ManagerX doesn't collect either,
+              you settle with the agent directly.
+            </p>
+          </div>
+        )}
         <div className="sm:col-span-2">
           <label className="label">What the agent needs to work with</label>
           <textarea className="input min-h-[110px] resize-y" value={form.service_details}

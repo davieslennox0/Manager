@@ -14,6 +14,7 @@ missed or repeated tick costs nothing.
 import asyncio
 import calendar
 import datetime
+import decimal
 import uuid
 
 import config
@@ -33,6 +34,39 @@ LIVE_STATUSES = ("claimed", "active")
 # Agent-settable cycle outcomes. 'skipped' is deliberately not here: it's the
 # household's word (via cancel/pause), not the agent's.
 AGENT_CYCLE_STATUSES = ("done", "not_done")
+
+
+# ManagerX's cut, quoted to the household while they are still typing the budget.
+# It is added ON TOP of the bill budget rather than skimmed out of it, and that
+# direction is the whole point: a bill paid 0.1% short is a bill the provider
+# rejects, and the household ends up disconnected while believing the gig was
+# funded. The agent must receive the full bill amount, so the fee is the
+# household's cost, disclosed before they commit rather than discovered after.
+PLATFORM_FEE_RATE = decimal.Decimal("0.001")   # 0.1%
+
+
+def fee_breakdown(budget_amount: str) -> dict:
+    """Split a household's bill budget into what the agent needs and what
+    ManagerX charges on top. Money is text everywhere else in this module; this
+    is the one place it is arithmetic, so it uses Decimal — binary floats would
+    round a naira the wrong way often enough to matter over a year of cycles."""
+    try:
+        bill = decimal.Decimal(str(budget_amount).strip().replace(",", ""))
+    except (decimal.InvalidOperation, AttributeError):
+        return {}
+    if bill <= 0:
+        return {}
+    cents = decimal.Decimal("0.01")
+    fee = (bill * PLATFORM_FEE_RATE).quantize(cents, rounding=decimal.ROUND_HALF_UP)
+    return {
+        "bill_budget": str(bill.quantize(cents, rounding=decimal.ROUND_HALF_UP)),
+        "platform_fee": str(fee),
+        "total": str((bill + fee).quantize(cents, rounding=decimal.ROUND_HALF_UP)),
+        "rate": str(PLATFORM_FEE_RATE),
+        "note": "The agent receives the full bill budget — the ManagerX fee is "
+                "added on top so the bill is never paid short. Both figures are "
+                "listed information; ManagerX does not collect either one.",
+    }
 
 
 def today() -> datetime.date:
@@ -63,6 +97,7 @@ def shape_gig(row, cycles: list | None = None) -> dict:
     can render a budget or a payment address without the context that ManagerX
     isn't in the middle of it."""
     out = {**dict(row), "bill_types": j(row["bill_types"], [])}
+    out["fee"] = fee_breakdown(row["budget_amount"])
     out["settlement"] = {
         "processed_by_managerx": False,
         "note": "Budget and payment address are listed information only. The "
