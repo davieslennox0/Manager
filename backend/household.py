@@ -37,15 +37,29 @@ AGENT_CYCLE_STATUSES = ("done", "not_done")
 
 
 # ManagerX's cut, quoted to the household while they are still typing the budget.
+#
+# It mirrors the fulfilment rail's own schedule at exactly double it. Pocket
+# Bills charges max(NGN 100, 2.5%) — measured off eleven unpaid 402 quotes on
+# 2026-07-23, flat below the ~NGN 4,000 crossover and 2.5% above. We charge
+# double because the rail's fee is paid out of ours: half covers what we owe
+# them, half is the margin. Mirroring their shape rather than picking a flat
+# rate is what keeps that true at every ticket size — a percentage alone would
+# lose money on small bills, and a flat fee alone would overcharge large ones.
+#
 # It is added ON TOP of the bill budget rather than skimmed out of it, and that
-# direction is the whole point: a bill paid 0.1% short is a bill the provider
+# direction is the whole point: a bill paid short is a bill the provider
 # rejects, and the household ends up disconnected while believing the gig was
 # funded. The agent must receive the full bill amount, so the fee is the
 # household's cost, disclosed before they commit rather than discovered after.
-PLATFORM_FEE_RATE = decimal.Decimal("0.001")   # 0.1%
+PLATFORM_FEE_RATE = decimal.Decimal("0.05")        # 5% = 2x the rail's 2.5%
+PLATFORM_FEE_FLOOR_NGN = decimal.Decimal("200")    # 2x the rail's NGN 100 floor
+
+# The floor is a naira figure, so it only applies to naira. Quoting NGN 200
+# against a dollar budget would be a 200-dollar fee on a 100-dollar bill.
+FLOOR_CURRENCIES = ("ngn", "naira", "₦")
 
 
-def fee_breakdown(budget_amount: str) -> dict:
+def fee_breakdown(budget_amount: str, currency: str = "") -> dict:
     """Split a household's bill budget into what the agent needs and what
     ManagerX charges on top. Money is text everywhere else in this module; this
     is the one place it is arithmetic, so it uses Decimal — binary floats would
@@ -57,15 +71,23 @@ def fee_breakdown(budget_amount: str) -> dict:
     if bill <= 0:
         return {}
     cents = decimal.Decimal("0.01")
-    fee = (bill * PLATFORM_FEE_RATE).quantize(cents, rounding=decimal.ROUND_HALF_UP)
+    fee = bill * PLATFORM_FEE_RATE
+    floor = (PLATFORM_FEE_FLOOR_NGN
+             if str(currency).strip().lower() in FLOOR_CURRENCIES
+             else decimal.Decimal(0))
+    fee = max(fee, floor).quantize(cents, rounding=decimal.ROUND_HALF_UP)
     return {
         "bill_budget": str(bill.quantize(cents, rounding=decimal.ROUND_HALF_UP)),
         "platform_fee": str(fee),
         "total": str((bill + fee).quantize(cents, rounding=decimal.ROUND_HALF_UP)),
         "rate": str(PLATFORM_FEE_RATE),
+        "floor": str(floor) if floor else "",
+        "at_floor": fee == floor and floor > 0,
         "note": "The agent receives the full bill budget — the ManagerX fee is "
-                "added on top so the bill is never paid short. Both figures are "
-                "listed information; ManagerX does not collect either one.",
+                "added on top so the bill is never paid short. The fee covers "
+                "what the agent pays the billing rail to fulfil the work. Both "
+                "figures are listed information; ManagerX does not collect either "
+                "one — you settle with the agent directly.",
     }
 
 
@@ -97,7 +119,7 @@ def shape_gig(row, cycles: list | None = None) -> dict:
     can render a budget or a payment address without the context that ManagerX
     isn't in the middle of it."""
     out = {**dict(row), "bill_types": j(row["bill_types"], [])}
-    out["fee"] = fee_breakdown(row["budget_amount"])
+    out["fee"] = fee_breakdown(row["budget_amount"], row["budget_currency"])
     out["settlement"] = {
         "processed_by_managerx": False,
         "note": "Budget and payment address are listed information only. The "

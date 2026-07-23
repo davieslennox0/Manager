@@ -188,6 +188,7 @@ async def browse_gigs(bill_type: str = "", cadence: str = "", q: str = "",
         # One source of truth for the posting form's live fee quote — the browser
         # should never carry its own copy of the rate and drift from the server.
         "platform_fee_rate": str(household.PLATFORM_FEE_RATE),
+        "platform_fee_floor_ngn": str(household.PLATFORM_FEE_FLOOR_NGN),
         "facets": {
             "bill_types": [{"name": k, "count": v} for k, v in
                            sorted(bill_counts.items(), key=lambda x: -x[1])],

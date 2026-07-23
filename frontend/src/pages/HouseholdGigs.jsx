@@ -186,19 +186,26 @@ function PostGig({ onPosted }) {
   const [busy, setBusy] = useState(false);
   // The rate comes from the server rather than a constant in here, so the quote
   // the household sees can never drift from the one the API applies.
-  const [feeRate, setFeeRate] = useState(null);
+  const [fees, setFees] = useState(null);
 
   useEffect(() => {
     api("GET", "/v1/household-gigs")
-      .then((r) => setFeeRate(parseFloat(r.platform_fee_rate)))
+      .then((r) => setFees({ rate: parseFloat(r.platform_fee_rate),
+                             floor: parseFloat(r.platform_fee_floor_ngn) }))
       .catch(() => {});
   }, []);
 
   const bill = parseFloat(String(form.budget_amount).replace(/,/g, ""));
   const money = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2,
                                                     maximumFractionDigits: 2 });
-  const quote = feeRate && bill > 0
-    ? { fee: bill * feeRate, total: bill * (1 + feeRate) } : null;
+  // Mirrors fee_breakdown() in backend/household.py — the floor is a naira
+  // figure, so it only applies to naira budgets.
+  const isNgn = ["ngn", "naira", "₦"].includes(
+    String(form.budget_currency).trim().toLowerCase());
+  const quote = fees && bill > 0 ? (() => {
+    const fee = Math.max(bill * fees.rate, isNgn ? fees.floor : 0);
+    return { fee, total: bill + fee, atFloor: isNgn && fee === fees.floor };
+  })() : null;
 
   function toggle(bt) {
     setTypes((t) => (t.includes(bt) ? t.filter((x) => x !== bt) : [...t, bt]));
@@ -272,7 +279,9 @@ function PostGig({ onPosted }) {
             </div>
             <div className="flex justify-between py-0.5">
               <span className="text-neutral-500">
-                ManagerX fee ({(feeRate * 100).toFixed(1)}%)
+                ManagerX fee ({quote.atFloor
+                  ? `minimum ${money(fees.floor)} ${form.budget_currency}`
+                  : `${(fees.rate * 100).toFixed(1)}%`})
               </span>
               <span>{money(quote.fee)} {form.budget_currency}</span>
             </div>
@@ -284,8 +293,9 @@ function PostGig({ onPosted }) {
             <p className="text-xs text-neutral-500 mt-2 leading-relaxed">
               The fee is added on top so the agent always receives the full bill
               amount — a bill paid short gets rejected and leaves you disconnected.
-              Both figures are listed information: ManagerX doesn't collect either,
-              you settle with the agent directly.
+              It covers what the agent pays the billing rail to do the work. Both
+              figures are listed information: ManagerX doesn't collect either, you
+              settle with the agent directly.
             </p>
           </div>
         )}
