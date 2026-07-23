@@ -84,7 +84,30 @@ electricity bill. **This agent should not touch small top-ups** — `MIN_BUDGET`
 has to sit far above ₦100 or every cycle loses money, and electricity is the
 right anchor for exactly this reason.
 
-**The purchase failed at the provider.** Payment settled on-chain
+**Two purchases, two failures, nothing delivered, nothing refunded.**
+
+| | airt-200 | airt-100 |
+|---|---|---|
+| settlement | `pst_2628bcc40634420c8b0acc16dcd634e0` | `pst_` (see purchase100.json) |
+| paid | 0.217082 USDT `0xa49e5e01…` | 0.144447 USDT `0xa88a382c…` |
+| state | `provider_failed_unverified` | `needs_review` |
+| provider said | TRANSACTION FAILED | The operation was aborted due to timeout |
+| delivery code | *(none)* | *(none)* |
+| requery attempts | **0** | **0** |
+| refund | none | none |
+
+Two different failure modes — one a definite provider rejection, one a timeout
+of genuinely unknown outcome — and in both cases `requeryAttempts` stayed at 0
+and the state never moved. Their pipeline does not appear to retry or reconcile
+on its own. 0.361529 USDT is sitting unaccounted for.
+
+`needs_review` is the more dangerous of the two for an autonomous agent: a
+timeout means the data may or may not have been delivered, so an agent that
+retries risks double-vending and an agent that gives up risks reporting a bill
+unpaid that was actually paid. This is exactly the state our ledger parks for a
+human rather than guessing at.
+
+**The first purchase failed at the provider.** Payment settled on-chain
 (`0xa49e5e01…`, 0.217082 USDT taken) and the settlement came back
 `provider_failed_unverified` / "TRANSACTION FAILED", with no delivery code, no
 requery attempted, and no refund observed. So on the very first real transaction
